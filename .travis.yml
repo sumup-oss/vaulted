@@ -1,5 +1,10 @@
 sudo: false
 language: go
+# NOTE: Trigger CI only on push of these branches.
+# This does not disable PR trigger.
+branches:
+  only:
+    - master
 go:
   - 1.12.x
 os:
