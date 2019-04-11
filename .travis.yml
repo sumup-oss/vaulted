@@ -1,7 +1,8 @@
 sudo: false
 language: go
 go:
-  - 1.12.x
+  - go: 1.12.x
+    env: LATEST=true
 os:
   - linux
 env:
@@ -12,6 +13,23 @@ notifications:
   email: false
 before_script:
   - go install github.com/golangci/golangci-lint/cmd/golangci-lint
+  - go get github.com/mitchellh/gox
 script:
   - golangci-lint run
   - go run mage.go -v test
+after_success:
+  - |-
+    [ "${TRAVIS_TAG}" != "" ] && [ "${LATEST}" = true ] && gox -os="linux darwin windows" -arch="amd64" -ldflags "-X github.com/sumup-oss/vaulted/version.Version=${TRAVIS_TAG}` -output "dist/ {.Dir}}-{{.OS}}-{{.Arch}}"
+
+deploy:
+  provider: releases
+  api_key: "$GITHUB_TOKEN"
+  file_glob: true
+  file: "dist/*"
+  skip_cleanup: true
+  on:
+    go: 1.12.x
+    # NOTE: Only build and upload when new GitHub releases/tags are created
+    tags: true
+    condition: $LATEST = true
+    repo: sumup-oss/vaulted
