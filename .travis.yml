@@ -1,8 +1,7 @@
 sudo: false
 language: go
 go:
-  - go: 1.12.x
-    env: LATEST=true
+  - 1.12.x
 os:
   - linux
 env:
@@ -19,7 +18,7 @@ script:
   - go run mage.go -v test
 after_success:
   - |-
-    [ "${TRAVIS_TAG}" != "" ] && [ "${LATEST}" = true ] && gox -os="linux darwin windows" -arch="amd64" -ldflags "-X github.com/sumup-oss/vaulted/version.Version=${TRAVIS_TAG}` -output "dist/ {.Dir}}-{{.OS}}-{{.Arch}}"
+    [ "${TRAVIS_TAG}" != "" ] && [ "${TRAVIS_GO_VERSION}" = "1.12.x" ] && gox -os="linux darwin windows" -arch="amd64" -ldflags "-X github.com/sumup-oss/vaulted/version.Version=${TRAVIS_TAG}` -output "dist/ {.Dir}}-{{.OS}}-{{.Arch}}"
 
 deploy:
   provider: releases
