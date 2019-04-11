@@ -3,6 +3,8 @@ language: go
 branches:
   only:
     - master
+    # NOTE: Tagged commits
+    - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
 go:
   - 1.12.x
 os:
