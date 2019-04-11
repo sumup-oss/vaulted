@@ -1,0 +1,17 @@
+sudo: false
+language: go
+go:
+  - 1.12.x
+os:
+  - linux
+env:
+  - GO111MODULE=on
+git:
+  depth: 1
+notifications:
+  email: false
+before_script:
+  - go install github.com/golangci/golangci-lint/cmd/golangci-lint
+script:
+  - golangci-lint run
+  - go run mage.go -v test
