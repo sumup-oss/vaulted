@@ -1,5 +1,6 @@
 coverage.txt
 coverage.xml
+dist/
 test-report.xml
 coverage.out
 .idea

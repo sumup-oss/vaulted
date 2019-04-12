@@ -2,7 +2,6 @@ module github.com/sumup-oss/vaulted
 
 require (
 	github.com/go-ini/ini v1.42.0
-	github.com/google/addlicense v0.0.0-20190107131845-2e5cf00261bf // indirect
 	github.com/hashicorp/hcl v1.0.0
 	github.com/magefile/mage v1.8.0
 	github.com/palantir/stacktrace v0.0.0-20161112013806-78658fd2d177
