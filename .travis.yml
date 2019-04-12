@@ -22,7 +22,7 @@ script:
   - go run mage.go -v test
 after_success:
   - go get github.com/mitchellh/gox
-  - '[ "${TRAVIS_TAG}" != "" ] && [ "${TRAVIS_GO_VERSION}" = "1.12.x" ] && gox -os="linux darwin windows" -arch="amd64" -ldflags "-X github.com/sumup-oss/vaulted/version.Version=${TRAVIS_TAG}" -output "dist/{{.Dir}}-{{.OS}}-${TRAVIS_TAG}-{{.Arch}}"'
+  - '[ "${TRAVIS_TAG}" != "" ] && [ "${TRAVIS_GO_VERSION}" = "1.12.x" ] && gox -os="linux darwin windows" -arch="amd64" -ldflags "-X github.com/sumup-oss/vaulted/version.Version=${TRAVIS_TAG}" -output "dist/{{.Dir}}-${TRAVIS_TAG}_{{.OS}}-{{.Arch}}"'
 deploy:
   provider: releases
   overwrite: true
