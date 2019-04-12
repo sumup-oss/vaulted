@@ -48,3 +48,7 @@ what did you expect to happen, what actually happened.
 1. Make sure that tests and linter(s) pass locally for you.
 1. Submit a PR.
 1. Collaborate with the codeowners/reviewers to merge this in `master`.
+
+### Releasing
+
+Check out [RELEASE_PROCESS](./RELEASE_PROCESS.md)
