@@ -94,6 +94,10 @@ The `PKCS#1` PEM contains just the `private key` content.
 
 Check out [COMMANDS](./COMMANDS.md)
 
+## Contributing
+
+Check out [CONTRIBUTING](./CONTRIBUTING.md)
+
 ## About SumUp
 
 [SumUp](https://sumup.com) is a mobile-point of sale provider.
