@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/sumup-oss/vaulted.svg?branch=master)](https://travis-ci.org/sumup-oss/vaulted)
 
+[![Go Report Card](https://goreportcard.com/badge/github.com/sumup-oss/vaulted)](https://goreportcard.com/report/github.com/sumup-oss/vaulted)
+
 Multi purpose cryptography tool for encryption/decryption using AES256 GCM.
 
 A "swiss-army" encryption/decryption knife with focus on developer experience, ease-of-use and
