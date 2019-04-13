@@ -7,6 +7,9 @@ Multi purpose cryptography tool for encryption/decryption using AES256 GCM.
 A "swiss-army" encryption/decryption knife with focus on developer experience, ease-of-use and
  integration capabilities in infrastructure-as-code software such as https://github.com/hashicorp/terraform.
 
+Combined with https://github.com/sumup-oss/terraform-provider-vaulted, it's shown 
+ at https://medium.com/@syndbg/provisioning-vault-encrypted-secrets-using-terraform-using-sumup-oss-vaulted-and-4aa9721d082c?source=friends_link&sk=9eabe1bbe6ba089fe176d94cf413862d
+
 ## Why
 
 * Ease-of-use.
