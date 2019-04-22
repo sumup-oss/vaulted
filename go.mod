@@ -8,6 +8,6 @@ require (
 	github.com/smartystreets/goconvey v0.0.0-20190222223459-a17d461953aa // indirect
 	github.com/spf13/cobra v0.0.3
 	github.com/stretchr/testify v1.3.0
-	github.com/sumup-oss/go-pkgs v0.0.0-20190329174334-444f547bff5a
+	github.com/sumup-oss/go-pkgs v0.0.0-20190422205605-69621402744f
 	gopkg.in/ini.v1 v1.42.0 // indirect
 )
