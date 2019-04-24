@@ -53,6 +53,16 @@ Change line format:
 
 ## Unreleased (master)
 
+## v0.2.0
+
+### Added
+
+* Support to read public and private keys from []byte ; Ref: https://github.com/sumup-oss/vaulted/pull/2
+
+### Fixed
+
+* Fixed test execution on windows ; Ref: https://github.com/sumup-oss/vaulted/pull/2
+
 ## v0.1.0
 
 ### Added
