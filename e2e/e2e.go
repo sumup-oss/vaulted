@@ -20,6 +20,7 @@ import (
 	"log"
 	stdOs "os"
 	"os/exec"
+	"runtime"
 
 	"github.com/sumup-oss/go-pkgs/os"
 )
@@ -77,6 +78,16 @@ func GoBuild(osExecutor os.OsExecutor) string {
 	err = tmpFile.Close()
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	// NOTE: On windows the temp file created in the previous step cannot be overwritten
+	err = osExecutor.Remove(tmpFilename)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if runtime.GOOS == "windows" {
+		tmpFilename += ".exe"
 	}
 
 	cmd := exec.Command(

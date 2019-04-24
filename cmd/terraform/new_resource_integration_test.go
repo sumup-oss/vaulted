@@ -21,8 +21,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/sumup-oss/vaulted/pkg/vaulted"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/sumup-oss/vaulted/pkg/testutils"
@@ -174,13 +174,7 @@ func TestNewResourceCmd_Execute(t *testing.T) {
 			regexMatches := testutils.NewTerraformRegex.FindAllStringSubmatch(string(outContent), -1)
 			assert.Equal(t, 1, len(regexMatches))
 
-			resourcePrefix := strings.Replace(string(outPathFlag), ".", "_", -1)
-			resourcePrefix = strings.Replace(
-				resourcePrefix,
-				string(filepath.Separator),
-				"_",
-				-1,
-			)
+			resourcePrefix := vaulted.SanitizeFilename(outPathFlag)
 			fullResourceName := fmt.Sprintf("%s_%s", resourcePrefix, resourceNameArg)
 
 			resource := regexMatches[0]

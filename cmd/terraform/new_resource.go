@@ -16,12 +16,12 @@ package terraform
 
 import (
 	"fmt"
-	"path/filepath"
-	"strings"
 
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cobra"
 	"github.com/sumup-oss/go-pkgs/os"
+
+	"github.com/sumup-oss/vaulted/pkg/vaulted"
 
 	"github.com/sumup-oss/vaulted/cli"
 	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
@@ -123,13 +123,7 @@ func NewNewResourceCommand(
 			if outFilePath == "" {
 				fullResourceName = resourceName
 			} else {
-				resourcePrefix := strings.Replace(outFilePath, ".", "_", -1)
-				resourcePrefix = strings.Replace(
-					resourcePrefix,
-					string(filepath.Separator),
-					"_",
-					-1,
-				)
+				resourcePrefix := vaulted.SanitizeFilename(outFilePath)
 				fullResourceName = fmt.Sprintf("%s_%s", resourcePrefix, resourceName)
 			}
 
