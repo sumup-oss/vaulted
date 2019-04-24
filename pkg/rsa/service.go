@@ -62,6 +62,10 @@ func (s *Service) ReadPublicKeyFromPath(publicKeyPath string) (*rsa.PublicKey, e
 		)
 	}
 
+	return s.ReadPublicKeyFromBytes(publicKeyContent)
+}
+
+func (s *Service) ReadPublicKeyFromBytes(publicKeyContent []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(publicKeyContent)
 	if block == nil || block.Type != pemBlockPublicKeyName {
 		return nil, errDecodePublicKeyPem
@@ -92,6 +96,10 @@ func (s *Service) ReadPrivateKeyFromPath(privateKeyPath string) (*rsa.PrivateKey
 		)
 	}
 
+	return s.ReadPrivateKeyFromBytes(privateKeyContent)
+}
+
+func (s *Service) ReadPrivateKeyFromBytes(privateKeyContent []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(privateKeyContent)
 	if block == nil || block.Type != pemBlockPrivateKeyName {
 		return nil, errDecodePrivateKeyPem

@@ -14,6 +14,14 @@
 
 package vaulted
 
+import (
+	"path/filepath"
+	"regexp"
+	"strings"
+)
+
+var replaceWindowsDriveRegex = regexp.MustCompile(`(?i)[a-z]:\\`)
+
 func Contains(array []string, needle string) bool {
 	for _, v := range array {
 		if v == needle {
@@ -21,4 +29,23 @@ func Contains(array []string, needle string) bool {
 		}
 	}
 	return false
+}
+
+func SanitizeFilename(filename string) string {
+	sanitizedName := strings.Replace(filename, ".", "_", -1)
+	sanitizedName = replaceWindowsDriveRegex.ReplaceAllString(sanitizedName, "")
+	sanitizedName = strings.Replace(
+		sanitizedName,
+		string(filepath.Separator),
+		"_",
+		-1,
+	)
+	// NOTE: We need to replace the unix file separator, too because on windows the "/" will not be replaced
+	sanitizedName = strings.Replace(
+		sanitizedName,
+		"/",
+		"_",
+		-1,
+	)
+	return sanitizedName
 }
