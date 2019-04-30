@@ -16,7 +16,7 @@ Combined with https://github.com/sumup-oss/terraform-provider-vaulted, it's show
 
 * Ease-of-use.
 * First-class terraform support. Also check https://github.com/sumup-oss/terraform-provider-vaulted/.
-* Asymmetric encryption. (**Private key-less encryption, using only a public key.**)
+* Asymmetric encryption.
 * **Large files are supported due to AES256 GCM encryption/decryption used.**
 * GPG/PGP keychain-less which means you don't need external GPG/PGP keychain and neither do your users. (Support for this may be added in the future)
 * Completely testable and high test coverage consisting of unit, integration and e2e tests.
