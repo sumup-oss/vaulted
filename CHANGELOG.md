@@ -53,6 +53,12 @@ Change line format:
 
 ## Unreleased (master)
 
+## v0.2.1
+
+### Changed
+
+* Commands that have sub-commands print help information by default ; Ref: https://github.com/sumup-oss/vaulted/pull/3
+
 ## v0.2.0
 
 ### Added
