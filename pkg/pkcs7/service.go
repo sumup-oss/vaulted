@@ -47,16 +47,19 @@ func (p *Service) Pad(bytesValue []byte, blockSize int) ([]byte, error) {
 	if blockSize <= 0 {
 		return nil, errLesserThanOneBlockSize
 	}
+
 	padSize := blockSize - (len(bytesValue) % blockSize)
 	if padSize == 0 {
 		padSize = blockSize
 	}
+
 	pad := bytes.Repeat(
 		[]byte{
 			byte(padSize),
 		},
 		padSize,
 	)
+
 	return append(bytesValue, pad...), nil
 }
 
@@ -82,6 +85,7 @@ func (p *Service) Unpad(bytesValue []byte, blockSize int) ([]byte, error) {
 	}
 
 	pad := bytesValue[valueLengthBeforePad:]
+
 	for _, padByte := range pad {
 		if padByte != byte(padSize) {
 			return nil, errInconsistentPadding

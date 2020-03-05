@@ -47,6 +47,7 @@ func (s *V1EncryptedContentService) Encrypt(
 	}
 
 	encryptedContent := NewEncryptedContent(ciphertext)
+
 	return encryptedContent, nil
 }
 
@@ -63,5 +64,6 @@ func (s *V1EncryptedContentService) Decrypt(
 	}
 
 	content := NewContent(plaintext)
+
 	return content, nil
 }

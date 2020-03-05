@@ -44,6 +44,7 @@ func (s *Service) WriteHCLfile(hclPrinter hcl.Printer, hclFile *ast.File, output
 			"failed to write HCL to file",
 		)
 	}
+
 	return nil
 }
 

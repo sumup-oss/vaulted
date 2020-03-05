@@ -97,6 +97,7 @@ func (s *EncryptedPayloadService) Serialize(encryptedPayload *EncryptedPayload) 
 	)
 
 	serialized := strings.Join(payloadParts, EncryptionPayloadSeparator)
+
 	return []byte(serialized), nil
 }
 
@@ -152,6 +153,7 @@ func (s *EncryptedPayloadService) Deserialize(encodedContent []byte) (*Encrypted
 	}
 
 	encryptedPayload := NewEncryptedPayload(parsedHeader, encryptedPassphrase, encryptedContent)
+
 	return encryptedPayload, nil
 }
 
@@ -171,6 +173,7 @@ func (s *EncryptedPayloadService) Encrypt(publicKey *rsa.PublicKey, payload *Pay
 		encryptedPassphrase,
 		encryptedContent,
 	)
+
 	return encryptedPayload, nil
 }
 
@@ -195,5 +198,6 @@ func (s *EncryptedPayloadService) Decrypt(
 	}
 
 	payload := NewPayload(encryptedPayload.Header, decryptedPassphrase, decryptedContent)
+
 	return payload, nil
 }

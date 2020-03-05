@@ -32,6 +32,7 @@ func (m *MockEncryptedContentService) Decrypt(
 	args := m.Called(passphrase, encryptedContent)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -43,6 +44,7 @@ func (m *MockEncryptedContentService) Deserialize(encoded []byte) (*content.Encr
 	args := m.Called(encoded)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -57,6 +59,7 @@ func (m *MockEncryptedContentService) Encrypt(
 	args := m.Called(passphrase, contentArg)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -68,6 +71,7 @@ func (m *MockEncryptedContentService) Serialize(encryptedContent *content.Encryp
 	args := m.Called(encryptedContent)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}

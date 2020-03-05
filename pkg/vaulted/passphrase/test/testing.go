@@ -33,6 +33,7 @@ func (m *MockEncryptedPassphraseService) Decrypt(
 	args := m.Called(privateKey, encryptedPassphrase)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -44,6 +45,7 @@ func (m *MockEncryptedPassphraseService) Deserialize(encoded []byte) (*passphras
 	args := m.Called(encoded)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -58,6 +60,7 @@ func (m *MockEncryptedPassphraseService) Encrypt(
 	args := m.Called(publicKey, passphraseArg)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -69,6 +72,7 @@ func (m *MockEncryptedPassphraseService) GeneratePassphrase(length int) (*passph
 	args := m.Called(length)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -82,6 +86,7 @@ func (m *MockEncryptedPassphraseService) Serialize(
 	args := m.Called(encryptedPassphrase)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}

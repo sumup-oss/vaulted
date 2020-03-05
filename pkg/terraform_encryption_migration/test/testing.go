@@ -40,6 +40,7 @@ func (m *MockTerraformEncryptionMigrationService) ConvertIniContentToLegacyTerra
 	args := m.Called(passphraseLength, iniContent, pubKey, encryptedPassphraseSvc, encryptedContentSvc)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -57,6 +58,7 @@ func (m *MockTerraformEncryptionMigrationService) ConvertIniContentToV1Terraform
 	args := m.Called(passphraseLength, iniContent, pubKey, encryptedPassphraseSvc, encryptedPayloadSvc)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -84,6 +86,7 @@ func (m *MockTerraformEncryptionMigrationService) MigrateEncryptedTerraformResou
 	)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -109,6 +112,7 @@ func (m *MockTerraformEncryptionMigrationService) RotateOrRekeyEncryptedTerrafor
 	)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}

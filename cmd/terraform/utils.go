@@ -34,15 +34,16 @@ func writeHCLout(
 	tfSvc external_interfaces.TerraformService,
 ) error {
 	var err error
+
 	if outFilePath == "" {
 		fmt.Fprintln(osExecutor.Stdout(), "Terraform HCL below:")
+
 		err = tfSvc.WriteHCLfile(hclSvc, hclFile, osExecutor.Stdout())
 		if err != nil {
 			return stacktrace.Propagate(
 				err,
 				"failed to write HCL to stdout",
 			)
-
 		}
 	} else {
 		outFile, err := osExecutor.OpenFile(

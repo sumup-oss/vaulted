@@ -26,6 +26,7 @@ func (m *MockAesService) EncryptCBC(key []byte, plaintext []byte) ([]byte, error
 	args := m.Called(key, plaintext)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -37,6 +38,7 @@ func (m *MockAesService) DecryptCBC(key []byte, plaintext []byte) ([]byte, error
 	args := m.Called(key, plaintext)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -48,6 +50,7 @@ func (m *MockAesService) EncryptGCM(key []byte, plaintext []byte) ([]byte, error
 	args := m.Called(key, plaintext)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -59,6 +62,7 @@ func (m *MockAesService) DecryptGCM(key []byte, plaintext []byte) ([]byte, error
 	args := m.Called(key, plaintext)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}

@@ -70,5 +70,6 @@ func NewLegacyCmd(
 			terraformEncryptionMigrationSvc,
 		),
 	)
+
 	return cmdInstance
 }

@@ -50,6 +50,7 @@ func (s *LegacyEncryptedContentService) Encrypt(
 	}
 
 	encryptedContent := NewEncryptedContent(ciphertext)
+
 	return encryptedContent, nil
 }
 
@@ -66,5 +67,6 @@ func (s *LegacyEncryptedContentService) Decrypt(
 	}
 
 	content := NewContent(plaintext)
+
 	return content, nil
 }

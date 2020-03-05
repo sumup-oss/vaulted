@@ -40,8 +40,8 @@ func (s *Service) ReadIniAtPath(path string) (*ini.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	return cfg, nil
 
+	return cfg, nil
 }
 
 func (s *Service) ParseIniFileContents(file *ini.File) *Content {
@@ -66,5 +66,6 @@ func (s *Service) ParseIniFileContents(file *ini.File) *Content {
 
 		iniContent.AddSection(iniSection)
 	}
+
 	return iniContent
 }

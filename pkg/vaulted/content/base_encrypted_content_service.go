@@ -36,5 +36,6 @@ func (s *baseEncryptedContentService) Deserialize(encoded []byte) (*EncryptedCon
 	}
 
 	encryptedContent := NewEncryptedContent(decoded)
+
 	return encryptedContent, nil
 }

@@ -31,6 +31,8 @@ linters-settings:
   goconst:
     min-len: 2
     min-occurrences: 2
+  gocognit:
+    min-complexity: 55
   depguard:
     list-type: blacklist
     packages:
@@ -63,6 +65,12 @@ linters:
     - gochecknoglobals
     # NOTE: Full of false positives.
     - interfacer
+    # NOTE: Function length is not an offense.
+    - funlen
+    # TODO: Fix false positives
+    - gomnd
+    # NOTE: "Packages names should not use underscores" is not a good practice while mixed caps is also disallowed.
+    - stylecheck
 issues:
   exclude-rules:
     - text: "weak cryptographic primitive"

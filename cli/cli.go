@@ -47,6 +47,7 @@ func readPassword(reader io.Reader) ([]byte, error) {
 	// NOTE: Since we're acting based on single characters,
 	// read only 1 byte at a time.
 	var readBuff [1]byte
+
 	for {
 		n, err := reader.Read(readBuff[:])
 
@@ -55,14 +56,17 @@ func readPassword(reader io.Reader) ([]byte, error) {
 			if readBuff[0] == '\n' {
 				return readContent, nil
 			}
+
 			readContent = append(readContent, readBuff[0])
 		}
+
 		if err != nil {
 			// NOTE: Accept EOF-terminated content if not empty,
 			// as other stdin-reading CLIs do.
 			if err == io.EOF && len(readContent) > 0 {
 				err = nil
 			}
+
 			return readContent, err
 		}
 	}
