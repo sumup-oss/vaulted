@@ -51,7 +51,6 @@ func TestRootCmd_Execute(t *testing.T) {
 	outputBuff := &bytes.Buffer{}
 
 	osExecutor := ostest.NewFakeOsExecutor(t)
-	osExecutor.On("Stdout").Return(outputBuff)
 
 	rsaSvc := rsa.NewRsaService(osExecutor)
 	aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
@@ -65,7 +64,31 @@ func TestRootCmd_Execute(t *testing.T) {
 		outputBuff,
 	)
 
-	assert.Equal(t, "Use `--help` to see available commands", outputBuff.String())
+	assert.Equal(
+		t,
+		`Vault encrypt/decrypt using asymmetric RSA keys and AES
+
+Usage:
+  vaulted [flags]
+  vaulted [command]
+
+Available Commands:
+  decrypt     Decrypt a file/value
+  encrypt     Encrypt a file/value
+  help        Help about any command
+  legacy      Legacy Proof-of-concept-phase commands
+  rekey       Rekey (decrypt and encrypt using different keypair) a file/value
+  rotate      Rotate (decrypt and encrypt) a file/value
+  terraform   Terraform resources related commands
+  version     Print the version of vaulted
+
+Flags:
+  -h, --help   help for vaulted
+
+Use "vaulted [command] --help" for more information about a command.
+`,
+		outputBuff.String(),
+	)
 	assert.Nil(t, err)
 
 	osExecutor.AssertExpectations(t)

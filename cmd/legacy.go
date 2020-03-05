@@ -15,8 +15,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/sumup-oss/go-pkgs/os"
 
@@ -41,8 +39,7 @@ func NewLegacyCmd(
 		Short: "Legacy Proof-of-concept-phase commands",
 		Long:  "Legacy Proof-of-concept-phase commands that are now deprecated",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintf(osExecutor.Stdout(), "Use `--help` to see available commands")
-			return nil
+			return cmd.Help()
 		},
 	}
 

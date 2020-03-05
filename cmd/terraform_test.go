@@ -77,8 +77,6 @@ func TestTerraformCmd_Execute(t *testing.T) {
 	outputBuff := &bytes.Buffer{}
 
 	osExecutor := ostest.NewFakeOsExecutor(t)
-	osExecutor.On("Stdout").Return(outputBuff)
-
 	b64Svc := base64.NewBase64Service()
 	rsaSvc := rsa.NewRsaService(osExecutor)
 	aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
@@ -112,7 +110,29 @@ func TestTerraformCmd_Execute(t *testing.T) {
 		outputBuff,
 	)
 
-	assert.Equal(t, "Use `--help` to see available commands", outputBuff.String())
+	assert.Equal(
+		t,
+		`Terraform resources related commands
+
+Usage:
+  terraform [flags]
+  terraform [command]
+
+Available Commands:
+  help         Help about any command
+  ini          Convert an INI file to Terraform file
+  migrate      Reads terraform resources file and migrates them to new encryption format
+  new-resource Create new terraform vaulted vault secret resource
+  rekey        Rekey (decrypt and encrypt using different keypair) existing terraform resources
+  rotate       Rotate (decrypt and encrypt) existing terraform resources
+
+Flags:
+  -h, --help   help for terraform
+
+Use "terraform [command] --help" for more information about a command.
+`,
+		outputBuff.String(),
+)
 	assert.Nil(t, err)
 
 	osExecutor.AssertExpectations(t)
