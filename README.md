@@ -1,7 +1,6 @@
 # vaulted
 
-[![Build Status](https://travis-ci.org/sumup-oss/vaulted.svg?branch=master)](https://travis-ci.org/sumup-oss/vaulted)
-
+[![Build status](https://github.com/sumup-oss/vaulted/workflows/Go/badge.svg?branch=master&event=push)](https://github.com/sumup-oss/vaulted/actions?query=workflow%3AGo)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sumup-oss/vaulted)](https://goreportcard.com/report/github.com/sumup-oss/vaulted)
 
 Multi purpose cryptography tool for encryption/decryption using AES256 GCM.
