@@ -35,18 +35,17 @@ func (m *MockTerraformSvc) TerraformContentToHCLfile(
 	args := m.Called(hclParser, terraformContent)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
 
 	return returnValue.(*ast.File), nil
-
 }
 
 func (m *MockTerraformSvc) WriteHCLfile(hclPrinter hcl.Printer, hclFile *ast.File, output io.Writer) error {
 	args := m.Called(hclPrinter, hclFile, output)
 	return args.Error(0)
-
 }
 
 func (m *MockTerraformSvc) TerraformResourceToHCLfile(
@@ -56,6 +55,7 @@ func (m *MockTerraformSvc) TerraformResourceToHCLfile(
 	args := m.Called(hclParser, resource)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -71,6 +71,7 @@ func (m *MockTerraformSvc) ModifyInPlaceHclAst(
 	args := m.Called(hclParser, hclBytes, objectItemVisitorFunc)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}

@@ -38,5 +38,6 @@ func NewVersionCmd(
 			return nil
 		},
 	}
+
 	return cmdInstance
 }

@@ -50,6 +50,7 @@ func (s *EncryptedPassphraseService) Deserialize(encoded []byte) (*EncryptedPass
 	}
 
 	encryptedPassphrase := NewEncryptedPassphrase(decoded)
+
 	return encryptedPassphrase, nil
 }
 
@@ -89,6 +90,7 @@ func (s *EncryptedPassphraseService) Decrypt(
 
 func (s *EncryptedPassphraseService) GeneratePassphrase(length int) (*Passphrase, error) {
 	b := make([]byte, length)
+
 	_, err := randRead(b)
 	if err != nil {
 		return nil, err

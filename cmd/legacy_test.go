@@ -69,7 +69,6 @@ func TestLegacyCmd_Execute(t *testing.T) {
 	outputBuff := &bytes.Buffer{}
 
 	osExecutor := ostest.NewFakeOsExecutor(t)
-	osExecutor.On("Stdout").Return(outputBuff)
 
 	b64Svc := base64.NewBase64Service()
 	rsaSvc := rsa.NewRsaService(osExecutor)
@@ -98,7 +97,27 @@ func TestLegacyCmd_Execute(t *testing.T) {
 		outputBuff,
 	)
 
-	assert.Equal(t, "Use `--help` to see available commands", outputBuff.String())
+	assert.Equal(
+		t,
+		`Legacy Proof-of-concept-phase commands that are now deprecated
+
+Usage:
+  legacy [flags]
+  legacy [command]
+
+Available Commands:
+  decrypt     Decrypt a file/value
+  encrypt     Encrypt a file/value
+  help        Help about any command
+  ini         Convert an INI file to Terraform file
+
+Flags:
+  -h, --help   help for legacy
+
+Use "legacy [command] --help" for more information about a command.
+`,
+		outputBuff.String(),
+	)
 	assert.Nil(t, err)
 
 	osExecutor.AssertExpectations(t)

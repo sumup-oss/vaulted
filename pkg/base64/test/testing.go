@@ -26,6 +26,7 @@ func (m *MockBase64Service) Serialize(raw []byte) ([]byte, error) {
 	args := m.Called(raw)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -35,8 +36,10 @@ func (m *MockBase64Service) Serialize(raw []byte) ([]byte, error) {
 
 func (m *MockBase64Service) Deserialize(encoded []byte) ([]byte, error) {
 	args := m.Called(encoded)
+
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}

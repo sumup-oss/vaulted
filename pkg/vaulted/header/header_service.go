@@ -68,6 +68,7 @@ func (s *HeaderService) Serialize(header *Header) ([]byte, error) {
 	}
 
 	serialized := strings.Join(headerParts, headerPartSeparator)
+
 	return []byte(serialized), nil
 }
 

@@ -42,6 +42,7 @@ func NewBuild(binaryPath, workDir string) *Build {
 }
 
 func (b *Build) cmd(args ...string) *exec.Cmd {
+	//nolint:gosec
 	cmd := exec.Command(b.binaryPath, args...)
 	cmd.Dir = b.workDir
 
@@ -55,8 +56,7 @@ func (b *Build) cmd(args ...string) *exec.Cmd {
 func (b *Build) Run(args ...string) (string, string, error) {
 	cmdInstance := b.cmd(args...)
 
-	var stdoutBuffer bytes.Buffer
-	var stdErrBuffer bytes.Buffer
+	var stdoutBuffer, stdErrBuffer bytes.Buffer
 
 	// NOTE: Don't need stdin.
 	cmdInstance.Stdin = nil
@@ -64,6 +64,7 @@ func (b *Build) Run(args ...string) (string, string, error) {
 	cmdInstance.Stderr = &stdErrBuffer
 
 	err := cmdInstance.Run()
+
 	return stdoutBuffer.String(), stdErrBuffer.String(), err
 }
 

@@ -253,6 +253,7 @@ func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
 
 		// NOTE: Overwrite content to new `payload_json` value.
 		itemValObject.List.Items = s.writeVaultedVaultSecretASTitems(tfPath, serializedEncryptedPayload)
+
 		return nil
 	}
 }
@@ -300,7 +301,7 @@ func (s *Service) migrateEncryptedTerraformResourceHclObjectItemVisitor(
 			)
 		}
 
-		var tfPath, tfEncryptedDataJson, tfEncryptedPassphrase string
+		var tfPath, tfEncryptedDataJSON, tfEncryptedPassphrase string
 
 		for _, itemObj := range itemValObject.List.Items {
 			var err error
@@ -332,7 +333,7 @@ func (s *Service) migrateEncryptedTerraformResourceHclObjectItemVisitor(
 					)
 				}
 			case "encrypted_data_json":
-				tfEncryptedDataJson, err = s.getStringValueOfHCLobjectItemKey(itemObj)
+				tfEncryptedDataJSON, err = s.getStringValueOfHCLobjectItemKey(itemObj)
 				if err != nil {
 					return stacktrace.Propagate(
 						err,
@@ -361,7 +362,7 @@ func (s *Service) migrateEncryptedTerraformResourceHclObjectItemVisitor(
 			)
 		}
 
-		if len(tfEncryptedDataJson) == 0 {
+		if len(tfEncryptedDataJSON) == 0 {
 			return stacktrace.NewError(
 				"empty `encrypted_data_json` string value for `vault_encrypted_secret` `%s`",
 				item.Keys[2].Token.Text,
@@ -393,7 +394,7 @@ func (s *Service) migrateEncryptedTerraformResourceHclObjectItemVisitor(
 			)
 		}
 
-		legacyEncryptedContent, err := legacyEncryptedContentSvc.Deserialize([]byte(tfEncryptedDataJson))
+		legacyEncryptedContent, err := legacyEncryptedContentSvc.Deserialize([]byte(tfEncryptedDataJSON))
 		if err != nil {
 			return stacktrace.NewError(
 				"failed to deserialize `encrypted_data_json` for `vault_encrypted_secret` `%s`",
@@ -444,6 +445,7 @@ func (s *Service) migrateEncryptedTerraformResourceHclObjectItemVisitor(
 
 		// NOTE: Start overwriting content to new encryption-usage resource `vaulted_vault_secret` format.
 		itemValObject.List.Items = s.writeVaultedVaultSecretASTitems(tfPath, serializedEncryptedPayload)
+
 		return nil
 	}
 }
@@ -494,7 +496,7 @@ func (s *Service) ConvertIniContentToLegacyTerraformContent(
 				"value": sectionValue.Value,
 			}
 
-			dataJson, err := json.Marshal(valueMap)
+			dataJSON, err := json.Marshal(valueMap)
 			if err != nil {
 				return nil, stacktrace.Propagate(
 					err,
@@ -528,7 +530,8 @@ func (s *Service) ConvertIniContentToLegacyTerraformContent(
 				)
 			}
 
-			content := content.NewContent(dataJson)
+			content := content.NewContent(dataJSON)
+
 			encryptedContent, err := encryptedContentSvc.Encrypt(passphrase, content)
 			if err != nil {
 				return nil, stacktrace.Propagate(
@@ -585,7 +588,7 @@ func (s *Service) ConvertIniContentToV1TerraformContent(
 				"value": sectionValue.Value,
 			}
 
-			dataJson, err := json.Marshal(valueMap)
+			dataJSON, err := json.Marshal(valueMap)
 			if err != nil {
 				return nil, stacktrace.Propagate(
 					err,
@@ -606,8 +609,9 @@ func (s *Service) ConvertIniContentToV1TerraformContent(
 			payload := payload.NewPayload(
 				header.NewHeader(),
 				passphrase,
-				content.NewContent(dataJson),
+				content.NewContent(dataJSON),
 			)
+
 			encPayload, err := encryptedPayloadSvc.Encrypt(pubKey, payload)
 			if err != nil {
 				return nil, stacktrace.Propagate(

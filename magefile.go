@@ -39,7 +39,7 @@ var (
 )
 
 func Lint() error {
-	return sh.Run("golangci-lint", "run")
+	return sh.RunV("golangci-lint", "run")
 }
 
 // Test runs all the tests with coverage, but no JUnit report.
@@ -49,7 +49,7 @@ func Test() error {
 		args = append(args, "-v")
 	}
 
-	return sh.Run("go", args...)
+	return sh.RunV("go", args...)
 }
 
 // TestWithReports runs all tests with coverage and generates JUnit report in 'test-report.xml'.

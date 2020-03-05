@@ -15,8 +15,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/sumup-oss/go-pkgs/os"
 
@@ -50,8 +48,7 @@ func NewRootCmd(
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Fprintf(osExecutor.Stdout(), "Use `--help` to see available commands")
-			return nil
+			return cmd.Help()
 		},
 	}
 

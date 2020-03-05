@@ -41,6 +41,7 @@ func (m *MockHeaderService) Deserialize(content string) (*header.Header, error) 
 	args := m.Called(content)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}

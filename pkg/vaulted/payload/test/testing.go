@@ -32,6 +32,7 @@ func (m *MockEncryptedPayloadService) Serialize(
 	args := m.Called(encryptedPayload)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -45,6 +46,7 @@ func (m *MockEncryptedPayloadService) Deserialize(
 	args := m.Called(encodedContent)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -59,6 +61,7 @@ func (m *MockEncryptedPayloadService) Encrypt(
 	args := m.Called(publicKey, payloadArg)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
@@ -73,6 +76,7 @@ func (m *MockEncryptedPayloadService) Decrypt(
 	args := m.Called(privateKey, encryptedPayload)
 	returnValue := args.Get(0)
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}

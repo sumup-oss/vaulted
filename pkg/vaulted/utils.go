@@ -28,6 +28,7 @@ func Contains(array []string, needle string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -47,5 +48,6 @@ func SanitizeFilename(filename string) string {
 		"_",
 		-1,
 	)
+
 	return sanitizedName
 }

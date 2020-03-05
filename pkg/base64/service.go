@@ -33,6 +33,7 @@ func (s *Service) Serialize(raw []byte) ([]byte, error) {
 	)
 
 	base64.StdEncoding.Encode(encoded, raw)
+
 	return encoded, nil
 }
 

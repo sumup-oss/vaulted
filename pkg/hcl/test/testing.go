@@ -28,7 +28,9 @@ type MockHclParser struct {
 func (m *MockHclParser) Parse(src []byte) (*ast.File, error) {
 	args := m.Called(src)
 	returnValue := args.Get(0)
+
 	err := args.Error(1)
+
 	if returnValue == nil {
 		return nil, err
 	}
