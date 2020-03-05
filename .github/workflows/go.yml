@@ -47,9 +47,16 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-
-      - name: Test
+          
+      - name: Test (continue on error)
         run: go test -v ./...
+        if: "matrix.os == 'windows-latest'"
+        continue-on-error: true
+
+      - name: Test (stop on error)
+        run: go test -v ./...
+        if: "matrix.os != 'windows-latest'"
+        continue-on-error: false
 
   release:
     name: Release
