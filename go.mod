@@ -11,3 +11,5 @@ require (
 	github.com/sumup-oss/go-pkgs v0.0.0-20190422205605-69621402744f
 	gopkg.in/ini.v1 v1.42.0 // indirect
 )
+
+go 1.13
