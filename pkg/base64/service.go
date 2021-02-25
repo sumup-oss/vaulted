@@ -16,6 +16,8 @@ package base64
 
 import (
 	"encoding/base64"
+
+	"github.com/palantir/stacktrace"
 )
 
 type Service struct{}
@@ -47,7 +49,7 @@ func (s *Service) Deserialize(encoded []byte) ([]byte, error) {
 
 	n, err := base64.StdEncoding.Decode(dst, encoded)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to decode")
 	}
 
 	return dst[:n], nil

@@ -18,6 +18,4 @@ import (
 	"crypto/rand"
 )
 
-var (
-	randRead = rand.Read
-)
+var randRead = rand.Read

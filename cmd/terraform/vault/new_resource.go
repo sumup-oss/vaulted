@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package terraform
+package vault
 
 import (
 	"fmt"
@@ -21,11 +21,10 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/sumup-oss/go-pkgs/os"
 
-	"github.com/sumup-oss/vaulted/pkg/vaulted"
-
 	"github.com/sumup-oss/vaulted/cli"
 	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
 	"github.com/sumup-oss/vaulted/pkg/terraform"
+	"github.com/sumup-oss/vaulted/pkg/vaulted"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"

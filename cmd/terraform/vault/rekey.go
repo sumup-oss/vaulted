@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package terraform
+package vault
 
 import (
 	"github.com/palantir/stacktrace"
@@ -23,7 +23,7 @@ import (
 	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
 )
 
-func NewRotateCommand(
+func NewRekeyCommand(
 	osExecutor os.OsExecutor,
 	rsaSvc external_interfaces.RsaService,
 	encryptedPassphraseSvc external_interfaces.EncryptedPassphraseService,
@@ -33,43 +33,43 @@ func NewRotateCommand(
 	tfEncryptionMigrationSvc external_interfaces.TerraformEncryptionMigrationService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
-		Use: "rotate " +
-			"--public-key-path ./my-pubkey.pem " +
-			"--private-key-path ./my-privatekey.pem " +
-			"--in ./in.tf " +
-			"--out ./out.tf",
-		Short: "Rotate (decrypt and encrypt) existing terraform resources",
-		Long: "Rotate (decrypt and encrypt) existing terraform resources using AES256-GCM encryption. " +
-			"Public key must originate from same private key, otherwise you probably want" +
-			"to use `rekey` instead. " +
+		Use: "rekey --old-private-key-path ./old-my-privatekey.pem " +
+			"--new-public-key-path ./new-my-pubkey.pem " +
+			"--in ./mysecret.txt " +
+			"--out ./mysecret.tf",
+		Short: "Rekey (decrypt and encrypt using different keypair) existing terraform resources",
+		Long: "Rekey (decrypt and encrypt using different keypair) existing terraform resources using " +
+			"AES256-GCM symmetric encryption. " +
+			"Public key must NOT originate from same private key, otherwise you probably want" +
+			"to use `rotate` instead. " +
 			"Passfile runtime random generated and encrypted with RSA asymmetric keypair.",
 		RunE: func(cmdInstance *cobra.Command, args []string) error {
-			publicKeyPath := cmdInstance.Flag("public-key-path").Value.String()
+			oldPrivateKeyPath := cmdInstance.Flag("old-private-key-path").Value.String()
+			// NOTE: Read early to avoid needless decryption
+			oldPrivKey, err := rsaSvc.ReadPrivateKeyFromPath(oldPrivateKeyPath)
+			if err != nil {
+				return stacktrace.Propagate(
+					err,
+					"failed to read specified old private key",
+				)
+			}
+
+			newPublicKeyPath := cmdInstance.Flag("new-public-key-path").Value.String()
 
 			// NOTE: Read early to avoid needless encryption
-			pubKey, err := rsaSvc.ReadPublicKeyFromPath(publicKeyPath)
+			newPubKey, err := rsaSvc.ReadPublicKeyFromPath(newPublicKeyPath)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
-					"failed to read specified public key",
+					"failed to read specified new public key",
 				)
 			}
 
-			privateKeyPath := cmdInstance.Flag("private-key-path").Value.String()
-			// NOTE: Read early to avoid needless decryption
-			privKey, err := rsaSvc.ReadPrivateKeyFromPath(privateKeyPath)
-			if err != nil {
-				return stacktrace.Propagate(
-					err,
-					"failed to read specified private key",
-				)
-			}
-
-			if pubKey.N.Cmp(privKey.N) != 0 || pubKey.E != privKey.E {
+			if newPubKey.N.Cmp(oldPrivKey.N) == 0 && newPubKey.E == oldPrivKey.E {
 				return stacktrace.NewError(
-					"specified public key does not originate from specified private key. " +
-						"you're either misusing `rotate` or actually wanting to use " +
-						"`rekey`. Check `rotate --help` and `rekey --help` to " +
+					"specified public key originates from specified private key. " +
+						"you're either misusing `rekey` or actually wanting to use " +
+						"`rotate`. Check `rotate --help` and `rekey --help` to " +
 						"understand the difference",
 				)
 			}
@@ -80,7 +80,7 @@ func NewRotateCommand(
 			if inFilePath == "" {
 				inFileContent, err = cli.ReadFromStdin(
 					osExecutor,
-					"Enter terraform content to rotate: ",
+					"Enter terraform content to rekey: ",
 				)
 				if err != nil {
 					return stacktrace.Propagate(
@@ -101,15 +101,15 @@ func NewRotateCommand(
 			hclFile, err := tfEncryptionMigrationSvc.RotateOrRekeyEncryptedTerraformResourceHcl(
 				hclSvc,
 				inFileContent,
-				privKey,
-				pubKey,
+				oldPrivKey,
+				newPubKey,
 				encryptedPassphraseSvc,
 				v1EncryptedPayloadSvc,
 			)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
-					"failed to rotate read terraform resources",
+					"failed to rekey read terraform resources",
 				)
 			}
 			return writeHCLout(
@@ -123,20 +123,20 @@ func NewRotateCommand(
 	}
 
 	cmdInstance.PersistentFlags().String(
-		"public-key-path",
-		"",
-		"Path to RSA public key used to encrypt runtime random generated passphrase.",
-	)
-	//nolint:errcheck
-	cmdInstance.MarkPersistentFlagRequired("public-key-path")
-
-	cmdInstance.PersistentFlags().String(
-		"private-key-path",
+		"old-private-key-path",
 		"",
 		"Path to RSA private key used to decrypt specified `in` path content.",
 	)
 	//nolint:errcheck
-	cmdInstance.MarkPersistentFlagRequired("private-key-path")
+	cmdInstance.MarkPersistentFlagRequired("old-private-key-path")
+
+	cmdInstance.PersistentFlags().String(
+		"new-public-key-path",
+		"",
+		"Path to RSA public key used to encrypt runtime random generated passphrase.",
+	)
+	//nolint:errcheck
+	cmdInstance.MarkPersistentFlagRequired("new-public-key-path")
 
 	cmdInstance.PersistentFlags().String(
 		"in",
@@ -147,7 +147,7 @@ func NewRotateCommand(
 	cmdInstance.PersistentFlags().String(
 		"out",
 		"",
-		"Path to the output file, that's going to contain rotated terraform resources.",
+		"Path to the output file, that's going to be contain rekeyed terraform content.",
 	)
 
 	return cmdInstance

@@ -64,7 +64,7 @@ func (s *EncryptedPassphraseService) Encrypt(
 		passphrase.Content,
 	)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to encrypt passphrase")
 	}
 
 	return NewEncryptedPassphrase(
@@ -82,7 +82,7 @@ func (s *EncryptedPassphraseService) Decrypt(
 		encryptedPassphrase.Ciphertext,
 	)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to decrypt pasphrase")
 	}
 
 	return newPassphrase(plaintext), nil
@@ -93,7 +93,7 @@ func (s *EncryptedPassphraseService) GeneratePassphrase(length int) (*Passphrase
 
 	_, err := randRead(b)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to generate random sequence")
 	}
 
 	return newPassphrase(b), nil

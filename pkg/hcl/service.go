@@ -31,12 +31,12 @@ func NewHclService() *Service {
 	return &Service{}
 }
 
-// Parse parses HCL or JSON marshaled bytes and return HCL AST
+// Parse parses HCL or JSON marshaled bytes and return HCL AST.
 func (s *Service) Parse(src []byte) (*ast.File, error) {
 	return hcl.ParseBytes(src)
 }
 
-// Fprint pretty-prints (writes) HCL specified `node` in specified `output`
+// Fprint pretty-prints (writes) HCL specified `node` in specified `output`.
 func (s *Service) Fprint(output io.Writer, node ast.Node) error {
 	return printer.DefaultConfig.Fprint(output, node)
 }

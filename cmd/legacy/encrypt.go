@@ -131,7 +131,6 @@ func NewEncryptCommand(
 					serializedEncryptedContent,
 					0644,
 				)
-
 				if err != nil {
 					return stacktrace.Propagate(
 						err,

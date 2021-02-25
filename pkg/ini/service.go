@@ -16,6 +16,7 @@ package ini
 
 import (
 	"github.com/go-ini/ini"
+	"github.com/palantir/stacktrace"
 )
 
 const (
@@ -38,7 +39,7 @@ func (s *Service) ReadIniAtPath(path string) (*ini.File, error) {
 		path,
 	)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to read ini file")
 	}
 
 	return cfg, nil

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/palantir/stacktrace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/sumup-oss/vaulted/pkg/pkcs7"
@@ -67,7 +68,7 @@ func TestAesService_EncryptCBC(t *testing.T) {
 			actualReturn, actualErr := aesSvc.EncryptCBC(keyArg, plaintextArg)
 
 			require.Nil(t, actualReturn)
-			assert.Equal(t, fakeError.Error(), actualErr.Error())
+			assert.Equal(t, fakeError, stacktrace.RootCause(actualErr))
 
 			mockPkcs7Service.AssertExpectations(t)
 		},
@@ -163,7 +164,7 @@ func TestService_DecryptCBC(t *testing.T) {
 			actualReturn, actualErr := aesSvc.DecryptCBC(keyArg, ciphertextArg)
 
 			require.Nil(t, actualReturn)
-			assert.Equal(t, actualErr, errInvalidCBCKeySize)
+			assert.Equal(t, errInvalidCBCKeySize, stacktrace.RootCause(actualErr))
 		},
 	)
 
@@ -183,7 +184,7 @@ func TestService_DecryptCBC(t *testing.T) {
 			actualReturn, actualErr := aesSvc.DecryptCBC(keyArg, ciphertextArg)
 
 			require.Nil(t, actualReturn)
-			assert.Equal(t, actualErr, errTooShortCiphertext)
+			assert.Equal(t, errTooShortCiphertext, stacktrace.RootCause(actualErr))
 		},
 	)
 
@@ -229,7 +230,7 @@ func TestService_DecryptCBC(t *testing.T) {
 			actualReturn, actualErr := aesSvc.DecryptCBC(keyArg, cipherTextArg)
 
 			require.Nil(t, actualReturn)
-			assert.Equal(t, errInvalidBlockSize, actualErr)
+			assert.Equal(t, errInvalidBlockSize, stacktrace.RootCause(actualErr))
 		},
 	)
 
@@ -266,7 +267,7 @@ func TestService_DecryptCBC(t *testing.T) {
 
 			require.Nil(t, actualReturn)
 
-			assert.Equal(t, fakeError, actualErr)
+			assert.Equal(t, fakeError, stacktrace.RootCause(actualErr))
 
 			mockPkcs7Service.AssertExpectations(t)
 		},

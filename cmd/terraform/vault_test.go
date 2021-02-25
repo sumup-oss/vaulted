@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cmd
+package terraform
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ import (
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
-func TestNewTerraformCmd(t *testing.T) {
+func TestNewVaultCmd(t *testing.T) {
 	t.Parallel()
 
 	osExecutor := ostest.NewFakeOsExecutor(t)
@@ -54,7 +54,7 @@ func TestNewTerraformCmd(t *testing.T) {
 	tfSvc := terraform.NewTerraformService()
 	tfEncMigrationSvc := terraform_encryption_migration.NewTerraformEncryptionMigrationService(tfSvc)
 
-	actual := NewTerraformCmd(
+	actual := NewVaultCmd(
 		osExecutor,
 		rsaSvc,
 		ini.NewIniService(),
@@ -66,12 +66,12 @@ func TestNewTerraformCmd(t *testing.T) {
 		tfEncMigrationSvc,
 	)
 
-	assert.Equal(t, "terraform", actual.Use)
-	assert.Equal(t, "Terraform resources related commands", actual.Short)
-	assert.Equal(t, "Terraform resources related commands", actual.Long)
+	assert.Equal(t, "vault", actual.Use)
+	assert.Equal(t, "github.com/sumup-oss/terraform-provider-vaulted resources related commands", actual.Short)
+	assert.Equal(t, "github.com/sumup-oss/terraform-provider-vaulted resources related commands", actual.Long)
 }
 
-func TestTerraformCmd_Execute(t *testing.T) {
+func TestVaultCmd_Execute(t *testing.T) {
 	t.Parallel()
 
 	outputBuff := &bytes.Buffer{}
@@ -92,7 +92,7 @@ func TestTerraformCmd_Execute(t *testing.T) {
 	legacyEncContentSvc := content.NewLegacyEncryptedContentService(b64Svc, aesSvc)
 	tfEncMigrationSvc := terraform_encryption_migration.NewTerraformEncryptionMigrationService(tfSvc)
 
-	cmdInstance := NewTerraformCmd(
+	cmdInstance := NewVaultCmd(
 		osExecutor,
 		rsaSvc,
 		ini.NewIniService(),
@@ -112,20 +112,24 @@ func TestTerraformCmd_Execute(t *testing.T) {
 
 	assert.Equal(
 		t,
-		`Terraform resources related commands
+		`github.com/sumup-oss/terraform-provider-vaulted resources related commands
 
 Usage:
-  terraform [flags]
-  terraform [command]
+  vault [flags]
+  vault [command]
 
 Available Commands:
-  help        Help about any command
-  vault       github.com/sumup-oss/terraform-provider-vaulted resources related commands
+  help         Help about any command
+  ini          Convert an INI file to Terraform file
+  migrate      Reads terraform resources file and migrates them to new encryption format
+  new-resource Create new terraform vaulted vault secret resource
+  rekey        Rekey (decrypt and encrypt using different keypair) existing terraform resources
+  rotate       Rotate (decrypt and encrypt) existing terraform resources
 
 Flags:
-  -h, --help   help for terraform
+  -h, --help   help for vault
 
-Use "terraform [command] --help" for more information about a command.
+Use "vault [command] --help" for more information about a command.
 `,
 		outputBuff.String(),
 )
