@@ -21,7 +21,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/sumup-oss/go-pkgs/os"
 
-	"github.com/sumup-oss/vaulted/cli"
+	"github.com/sumup-oss/vaulted/internal/cli"
 	"github.com/sumup-oss/vaulted/pkg/aes"
 	"github.com/sumup-oss/vaulted/pkg/base64"
 	"github.com/sumup-oss/vaulted/pkg/pkcs7"

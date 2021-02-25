@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package vault
+package cli
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ import (
 	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
 )
 
-func writeHCLout(
+func WriteHCLout(
 	osExecutor os.OsExecutor,
 	outFilePath string,
 	hclSvc external_interfaces.HclService,

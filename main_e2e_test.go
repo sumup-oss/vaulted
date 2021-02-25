@@ -27,7 +27,7 @@ import (
 	"github.com/sumup-oss/go-pkgs/os"
 	"github.com/sumup-oss/go-pkgs/testutils"
 	theseusTestUtils "github.com/sumup-oss/go-pkgs/testutils"
-	"github.com/sumup-oss/vaulted/e2e"
+	"github.com/sumup-oss/vaulted/internal/e2e"
 	vaultedTestUtils "github.com/sumup-oss/vaulted/pkg/testutils"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
