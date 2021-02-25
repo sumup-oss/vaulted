@@ -49,7 +49,6 @@ func main() {
 		return
 	}
 
-	//nolint:errcheck,staticcheck
-	fmt.Fprintf(osExecutor.Stderr(), err.Error())
+	_, _ = fmt.Fprint(osExecutor.Stderr(), err.Error())
 	osExecutor.Exit(1)
 }

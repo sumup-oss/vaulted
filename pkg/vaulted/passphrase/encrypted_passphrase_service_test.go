@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/palantir/stacktrace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/sumup-oss/go-pkgs/os"
@@ -194,7 +195,7 @@ func TestEncryptedPassphraseService_Encrypt(t *testing.T) {
 			actualReturn, actualErr := svc.Encrypt(pubkeyArg, passphraseArg)
 
 			require.Nil(t, actualReturn)
-			assert.Equal(t, fakeError, actualErr)
+			assert.Equal(t,  fakeError, stacktrace.RootCause(actualErr))
 
 			mockRsaSvc.AssertExpectations(t)
 		},
@@ -267,7 +268,7 @@ func TestEncryptedPassphraseService_Decrypt(t *testing.T) {
 			actualReturn, actualErr := svc.Decrypt(privkeyArg, encryptedPassphraseArg)
 
 			require.Nil(t, actualReturn)
-			assert.Equal(t, fakeError, actualErr)
+			assert.Equal(t, fakeError, stacktrace.RootCause(actualErr))
 
 			mockRsaSvc.AssertExpectations(t)
 		},
@@ -326,7 +327,7 @@ func TestEncryptedPassphraseService_GeneratePassphrase(t *testing.T) {
 
 			actualReturn, actualErr := svc.GeneratePassphrase(lengthArg)
 			require.Nil(t, actualReturn)
-			assert.Equal(t, calledRandReadErr, actualErr)
+			assert.Equal(t, calledRandReadErr, stacktrace.RootCause(actualErr))
 		},
 	)
 

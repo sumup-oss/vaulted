@@ -12,11 +12,11 @@ All subcommands are:
 * [`vaulted decrypt`](#vaulted-decrypt)
 * [`vaulted rotate`](#vaulted-rotate)
 * [`vaulted rekey`](#vaulted-rekey)
-* [`vaulted terraform ini`](#vaulted-terraform-ini)
-* [`vaulted terraform migrate`](#vaulted-terraform-migrate)
-* [`vaulted terraform new-resource`](#vaulted-terraform-new-resource)
-* [`vaulted terraform rekey`](#vaulted-terraform-rekey)
-* [`vaulted terraform rotate`](#vaulted-terraform-rotate)
+* [`vaulted terraform vault ini`](#vaulted-terraform-vault-ini)
+* [`vaulted terraform vault migrate`](#vaulted-terraform-vault-migrate)
+* [`vaulted terraform vault new-resource`](#vaulted-terraform-vault-new-resource)
+* [`vaulted terraform vault rekey`](#vaulted-terraform-vault-rekey)
+* [`vaulted terraform vault rotate`](#vaulted-terraform-vault-rotate)
 
 ## `vaulted version`
 
@@ -164,36 +164,36 @@ It uses rekeys flow specified in [How it works](./HOW_IT_WORKS.md#re-key-secret-
 --out ./rekeyed_my_secrets.enc
 ```
 
-## `vaulted terraform ini`
+## `vaulted terraform vault ini`
 
 Converts an INI file to terraform file. It uses "future-proof" 
  `vaulted_vault_secret` terraform resources.
 
 ```shell
-> vaulted terraform ini \
+> vaulted terraform vault ini \
 --public-key-path pubkey.pem \
 --in ./my_secrets.ini \
 --out ./my_secrets.tf
 ```
 
-## `vaulted terraform migrate`
+## `vaulted terraform vault migrate`
 
 Migrates a terraform `in` file  with `vault_encrypted_secret` resources generated from `legacy ini`,
- to terraform `vaulted_vault_secret` resources as you would generate them from `terraform ini`.
+ to terraform `vaulted_vault_secret` resources as you would generate them from `terraform vault ini`.
  
 **If specified `out` already exists, it does not overwrite, it appends.**
 
 **Terraform resources different than `vault_encrypted_secret` are not modified. They're simply moved to `out`**
 
 ```shell
-> vaulted terraform migrate \
+> vaulted terraform vault migrate \
 --public-key-path ./my-pubkey.pem \
 --private-key-path ./my-privkey.pem \
 --in ./mysecret.tf \
 --out ./migrated.tf
 ```
 
-## `vaulted terraform new-resource`
+## `vaulted terraform vault new-resource`
 
 Create new terraform `vaulted_vault_secret` resource with specified `path` and `resource-name` (as suffix).
 
@@ -210,7 +210,7 @@ Create new terraform `vaulted_vault_secret` resource with specified `path` and `
 --resource-name example_app_example_key
 ```
 
-## `vaulted terraform rekey`
+## `vaulted terraform vault rekey`
 
 Rekeys an `in` terraform file and writes to `out` terraform file with rekeyed resources.
 
@@ -224,14 +224,14 @@ It uses rekeys flow specified in [How it works](./HOW_IT_WORKS.md#re-key-secret-
 **Terraform resources different than `vaulted_vault_secret` are not modified. They're simply moved to `out`**
 
 ```shell
-> vaulted terraform rekey \
+> vaulted terraform vault rekey \
 --new-public-key-path ./my-pubkey.pem \
 --old-private-key-path ./my-privkey.pem \
 --in new.tf \
 --out test.tf
 ```
 
-## `vaulted terraform rotate`
+## `vaulted terraform vault rotate`
 
 Rotates an `in` terraform file and writes to `out` terraform file with rekeyed resources.
 
@@ -242,7 +242,7 @@ It uses rotate flow specified in [How it works](./HOW_IT_WORKS.md#rotate-secret-
 **Terraform resources different than `vaulted_vault_secret` are not modified. They're simply moved to `out`**
 
 ```shell
-> vaulted terraform rotate \
+> vaulted terraform vault rotate \
 --public-key-path ./my-pubkey.pem \
 --private-key-path ./my-privatekey.pem \
 --in ./in.tf \

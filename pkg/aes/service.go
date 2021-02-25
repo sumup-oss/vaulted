@@ -30,9 +30,9 @@ const (
 	// implementation, anything other than `16bytes` (AES-128) will not work.
 	// AES-192 and AES-256 are not possible using CBC.
 	aesCBCblockSize = 16
-	// NOTE: This is AES-256 block size
+	// NOTE: This is AES-256 block size.
 	aesGCMblockSize = 32
-	// NOTE: Standard AES-256 GCM nonce size
+	// NOTE: Standard AES-256 GCM nonce size.
 	aesGCMNonceSize = 12
 )
 
@@ -65,7 +65,7 @@ func NewAesService(pkcs7Service pkcs7Service) *Service {
 func (s *Service) EncryptCBC(key []byte, plaintext []byte) ([]byte, error) {
 	paddedPlaintext, err := s.pkcs7Service.Pad(plaintext, aesCBCblockSize)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to pad plaintext")
 	}
 
 	if len(paddedPlaintext)%aesCBCblockSize != 0 {
@@ -87,7 +87,7 @@ func (s *Service) EncryptCBC(key []byte, plaintext []byte) ([]byte, error) {
 
 	_, err = io.ReadFull(rand.Reader, iv)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to read random sequence")
 	}
 
 	mode := cipher.NewCBCEncrypter(block, iv)
@@ -124,7 +124,7 @@ func (s *Service) DecryptCBC(key []byte, ciphertext []byte) ([]byte, error) {
 
 	plaintext, err := s.pkcs7Service.Unpad(pad, aesCBCblockSize)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to unpad padded text")
 	}
 
 	return plaintext, nil
@@ -148,7 +148,7 @@ func (s *Service) EncryptGCM(key []byte, plaintext []byte) ([]byte, error) {
 
 	_, err = io.ReadFull(rand.Reader, nonce)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to read random sequence")
 	}
 
 	mode, err := cipher.NewGCM(block)

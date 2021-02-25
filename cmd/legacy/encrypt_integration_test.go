@@ -591,7 +591,7 @@ Flags:
 				"WriteFile",
 				outPathFlag,
 				mock.AnythingOfType("[]uint8"),
-				mock.AnythingOfType("os.FileMode"),
+				mock.AnythingOfType("FileMode"),
 			).Return(fakeError)
 
 			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)

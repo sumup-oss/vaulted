@@ -12,18 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package terraform
+package vault
 
 import (
 	"fmt"
 	stdOs "os"
 
-	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
-
 	"github.com/hashicorp/hcl/hcl/ast"
-
 	"github.com/palantir/stacktrace"
 	"github.com/sumup-oss/go-pkgs/os"
+
+	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
 )
 
 func writeHCLout(

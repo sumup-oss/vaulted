@@ -53,6 +53,12 @@ Change line format:
 
 ## Unreleased (master)
 
+## v0.3.0
+
+### Changed
+
+* Commands from `terraform` sub-command are now part of `terraform vault`. This is to accommodate for future `terraform X` command where X might be another provider ; Ref: https://github.com/sumup-oss/vaulted/pull/5
+
 ## v0.2.1
 
 ### Changed

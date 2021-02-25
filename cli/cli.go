@@ -23,6 +23,8 @@ import (
 	"github.com/sumup-oss/go-pkgs/os"
 )
 
+var ErrEmptyValue = errors.New("empty value")
+
 func ReadFromStdin(osExecutor os.OsExecutor, promptMessage string) ([]byte, error) {
 	fmt.Fprint(osExecutor.Stdout(), promptMessage)
 
@@ -35,7 +37,7 @@ func ReadFromStdin(osExecutor os.OsExecutor, promptMessage string) ([]byte, erro
 	}
 
 	if value == nil {
-		return nil, errors.New("empty value")
+		return nil, ErrEmptyValue
 	}
 
 	return value, nil
@@ -63,7 +65,7 @@ func readPassword(reader io.Reader) ([]byte, error) {
 		if err != nil {
 			// NOTE: Accept EOF-terminated content if not empty,
 			// as other stdin-reading CLIs do.
-			if err == io.EOF && len(readContent) > 0 {
+			if errors.Is(err, io.EOF) && len(readContent) > 0 {
 				err = nil
 			}
 

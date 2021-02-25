@@ -33,20 +33,18 @@ func Contains(array []string, needle string) bool {
 }
 
 func SanitizeFilename(filename string) string {
-	sanitizedName := strings.Replace(filename, ".", "_", -1)
+	sanitizedName := strings.ReplaceAll(filename, ".", "_")
 	sanitizedName = replaceWindowsDriveRegex.ReplaceAllString(sanitizedName, "")
-	sanitizedName = strings.Replace(
+	sanitizedName = strings.ReplaceAll(
 		sanitizedName,
 		string(filepath.Separator),
 		"_",
-		-1,
 	)
 	// NOTE: We need to replace the unix file separator, too because on windows the "/" will not be replaced
-	sanitizedName = strings.Replace(
+	sanitizedName = strings.ReplaceAll(
 		sanitizedName,
 		"/",
 		"_",
-		-1,
 	)
 
 	return sanitizedName

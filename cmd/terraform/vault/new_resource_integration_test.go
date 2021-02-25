@@ -12,38 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package terraform
+package vault
 
 import (
 	"bytes"
 	"crypto/rand"
 	stdRsa "crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"path/filepath"
 	"testing"
 
-	"github.com/sumup-oss/vaulted/pkg/ini"
-	"github.com/sumup-oss/vaulted/pkg/terraform_encryption_migration"
+	"github.com/sumup-oss/vaulted/pkg/vaulted"
+
+	"github.com/sumup-oss/vaulted/pkg/testutils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/sumup-oss/go-pkgs/os"
 	"github.com/sumup-oss/go-pkgs/os/ostest"
-	"github.com/sumup-oss/go-pkgs/testutils"
+	theseusTestUtils "github.com/sumup-oss/go-pkgs/testutils"
 	"github.com/sumup-oss/vaulted/pkg/aes"
 	"github.com/sumup-oss/vaulted/pkg/base64"
 	"github.com/sumup-oss/vaulted/pkg/hcl"
 	"github.com/sumup-oss/vaulted/pkg/pkcs7"
 	"github.com/sumup-oss/vaulted/pkg/rsa"
 	"github.com/sumup-oss/vaulted/pkg/terraform"
-	vaultedTestUtils "github.com/sumup-oss/vaulted/pkg/testutils"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
-func TestIniCmd_Execute(t *testing.T) {
+func TestNewResourceCmd_Execute(t *testing.T) {
 	t.Run(
 		"with no arguments, it returns error",
 		func(t *testing.T) {
@@ -65,23 +67,17 @@ func TestIniCmd_Execute(t *testing.T) {
 			)
 			hclSvc := hcl.NewHclService()
 			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := terraform_encryption_migration.NewTerraformEncryptionMigrationService(
-				tfSvc,
-			)
-			iniSvc := ini.NewIniService()
 
-			cmdInstance := NewIniCommand(
+			cmdInstance := NewNewResourceCommand(
 				osExecutor,
 				rsaSvc,
-				iniSvc,
 				encPassphraseSvc,
 				encPayloadSvc,
 				hclSvc,
 				tfSvc,
-				tfEncMigrationSvc,
 			)
 
-			_, err := testutils.RunCommandInSameProcess(
+			_, err := theseusTestUtils.RunCommandInSameProcess(
 				cmdInstance,
 				[]string{},
 				outputBuff,
@@ -89,35 +85,45 @@ func TestIniCmd_Execute(t *testing.T) {
 
 			assert.Equal(
 				t,
-				`required flag(s) "in", "out", "public-key-path" not set`,
+				`required flag(s) "path", "public-key-path", "resource-name" not set`,
 				err.Error(),
 			)
 		},
 	)
 
 	t.Run(
-		"with 'public-key-path', 'in' and 'out' flags specified "+
-			"it writes migrated terraform resources at `out`",
+		"with 'public-key-path', 'path', 'resource-name', 'in' and 'out' flags specified "+
+			"it prints encrypted passphrase in stdout and "+
+			"writes encrypted content at 'out' file path",
 		func(t *testing.T) {
-			tmpDir := testutils.TestCwd(t, "vaulted")
+			tmpDir := theseusTestUtils.TestCwd(t, "vaulted")
 
+			outputBuff := &bytes.Buffer{}
 			realOsExecutor := &os.RealOsExecutor{}
 
-			iniContent := []byte(`[sectionExample]
-myKey=example
+			inPathFlag := filepath.Join(tmpDir, "in.raw")
+			inFileContent := []byte("mysecret")
 
-[sectionExampleAgain]
-myOtherKey=exampleother
-`)
-			inPathFlag := filepath.Join(tmpDir, "in.ini")
-
-			err := realOsExecutor.WriteFile(inPathFlag, iniContent, 0644)
+			err := realOsExecutor.WriteFile(inPathFlag, inFileContent, 0644)
 			require.Nil(t, err)
 
 			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)
 			require.Nil(t, err)
 
-			pubkeyPath := testutils.GenerateAndWritePublicKey(t, tmpDir, "key.pub", privKey)
+			pubkeyPathArg := filepath.Join(tmpDir, "key.pub")
+
+			pubkeyBytes, err := x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+			require.Nil(t, err)
+
+			pubkeyPemBytes := pem.EncodeToMemory(
+				&pem.Block{
+					Type:  "PUBLIC KEY",
+					Bytes: pubkeyBytes,
+				},
+			)
+
+			err = realOsExecutor.WriteFile(pubkeyPathArg, pubkeyPemBytes, 0644)
+			require.Nil(t, err)
 
 			rsaSvc := rsa.NewRsaService(realOsExecutor)
 			b64Svc := base64.NewBase64Service()
@@ -133,34 +139,32 @@ myOtherKey=exampleother
 			)
 			hclSvc := hcl.NewHclService()
 			tfSvc := terraform.NewTerraformService()
-			iniSvc := ini.NewIniService()
-			tfEncMigrationSvc := terraform_encryption_migration.NewTerraformEncryptionMigrationService(
-				tfSvc,
-			)
 
 			outPathFlag := filepath.Join(tmpDir, "out.tf")
-			cmdInstance := NewIniCommand(
+			cmdInstance := NewNewResourceCommand(
 				realOsExecutor,
 				rsaSvc,
-				iniSvc,
 				encPassphraseSvc,
 				encPayloadSvc,
 				hclSvc,
 				tfSvc,
-				tfEncMigrationSvc,
 			)
 
+			pathArg := "secret/exampleapp/example"
+			resourceNameArg := "exampleapp"
+
 			cmdArgs := []string{
-				fmt.Sprintf("--public-key-path=%s", pubkeyPath),
+				fmt.Sprintf("--public-key-path=%s", pubkeyPathArg),
 				fmt.Sprintf("--in=%s", inPathFlag),
 				fmt.Sprintf("--out=%s", outPathFlag),
+				fmt.Sprintf("--path=%s", pathArg),
+				fmt.Sprintf("--resource-name=%s", resourceNameArg),
 			}
 
-			var outputBuff bytes.Buffer
-			_, err = testutils.RunCommandInSameProcess(
+			_, err = theseusTestUtils.RunCommandInSameProcess(
 				cmdInstance,
 				cmdArgs,
-				&outputBuff,
+				outputBuff,
 			)
 			require.Nil(t, err)
 			assert.Equal(t, "", outputBuff.String())
@@ -168,43 +172,17 @@ myOtherKey=exampleother
 			outContent, err := realOsExecutor.ReadFile(outPathFlag)
 			require.Nil(t, err)
 
-			regexMatches := vaultedTestUtils.NewTerraformRegex.FindAllStringSubmatch(
-				string(outContent),
-				-1,
-			)
-			assert.Equal(t, 2, len(regexMatches))
+			regexMatches := testutils.NewTerraformRegex.FindAllStringSubmatch(string(outContent), -1)
+			assert.Equal(t, 1, len(regexMatches))
 
-			assert.Equal(
-				t,
-				"vaulted_vault_secret_sectionExampleAgain_myOtherKey",
-				regexMatches[0][1],
-			)
-			assert.Equal(
-				t,
-				"secret/sectionExampleAgain/myOtherKey",
-				regexMatches[0][2],
-			)
-			assert.NotEqual(
-				t,
-				"",
-				regexMatches[0][3],
-			)
+			resourcePrefix := vaulted.SanitizeFilename(outPathFlag)
+			fullResourceName := fmt.Sprintf("%s_%s", resourcePrefix, resourceNameArg)
 
-			assert.Equal(
-				t,
-				"vaulted_vault_secret_sectionExample_myKey",
-				regexMatches[1][1],
-			)
-			assert.Equal(
-				t,
-				"secret/sectionExample/myKey",
-				regexMatches[1][2],
-			)
-			assert.NotEqual(
-				t,
-				"",
-				regexMatches[1][3],
-			)
+			resource := regexMatches[0]
+			assert.Equal(t, fullResourceName, resource[1])
+			assert.Equal(t, pathArg, resource[2])
+			// NOTE: Encrypted payload is not empty
+			assert.NotEqual(t, "", resource[3])
 		},
 	)
 }

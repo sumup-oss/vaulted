@@ -14,4 +14,4 @@
 
 package version
 
-var Version string = `UNKNOWN. Please compile with -ldflags "-X github.com/sumup-oss/vaulted/version.Version=X.X.X"`
+const Version = "0.3.0"

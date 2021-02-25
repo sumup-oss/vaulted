@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"runtime"
 
+	"github.com/palantir/stacktrace"
 	"github.com/sumup-oss/go-pkgs/os"
 )
 
@@ -65,7 +66,7 @@ func (b *Build) Run(args ...string) (string, string, error) {
 
 	err := cmdInstance.Run()
 
-	return stdoutBuffer.String(), stdErrBuffer.String(), err
+	return stdoutBuffer.String(), stdErrBuffer.String(), stacktrace.Propagate(err, "failed to run cmd")
 }
 
 func GoBuild(osExecutor os.OsExecutor) string {

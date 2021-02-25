@@ -20,10 +20,6 @@ linters-settings:
   # print linter name in the end of issue text, default is true
   govet:
     check-shadowing: true
-  gocyclo:
-    # NOTE: Too-low cyclomatic complexity value
-    # results into worse code design and readability.
-    min-complexity: 25
   maligned:
     suggest-new: true
   dupl:
@@ -52,6 +48,10 @@ linters-settings:
   gocritic:
     enabled-tags:
       - performance
+  cyclop:
+    # NOTE: Too-low cyclomatic complexity value
+    # results into worse code design and readability.
+    max-complexity: 25
 
 linters:
   enable-all: true
@@ -71,8 +71,17 @@ linters:
     - gomnd
     # NOTE: "Packages names should not use underscores" is not a good practice while mixed caps is also disallowed.
     - stylecheck
+    # NOTE: Too verbose
+    - exhaustivestruct
+    # NOTE: Worse readability
+    - nlreturn
+    # NOTE: False-positives
+    - nestif
 issues:
   exclude-rules:
+    - text: "don't use an underscore in package name"
+      linters:
+        - revive
     - text: "weak cryptographic primitive"
       linters:
         - gosec
@@ -83,15 +92,24 @@ issues:
     - path: pkg/vaulted/content/v1_encrypted_content_service.go
       linters:
         - dupl
-    - path: cmd/terraform/rotate.go
+    - path: cmd/terraform/vault/rotate.go
       linters:
         - dupl
-    - path: cmd/terraform/rekey.go
+    - path: cmd/terraform/vault/rekey.go
       linters:
         - dupl
-    - path: cmd/terraform/ini.go
+    - path: cmd/terraform/vault/ini.go
       linters:
         - dupl
-    - path: cmd/legacy/ini.go
+    - path: cmd/legacy/vault/ini.go
       linters:
         - dupl
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+    - path: testing.go
+      linters:
+        - wrapcheck

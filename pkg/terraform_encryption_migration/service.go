@@ -39,13 +39,11 @@ const (
 	vaultedVaultResourceTypeName         = "vaulted_vault_secret"
 )
 
-var (
-	// HACK: HCL printer prints an equal sign in a `key = value` expression
-	// only when the line is positive. The line number does not matter.
-	hclEqualSign = token.Pos{
-		Line: 1,
-	}
-)
+// HACK: HCL printer prints an equal sign in a `key = value` expression
+// only when the line is positive. The line number does not matter.
+var hclEqualSign = token.Pos{
+	Line: 1,
+}
 
 type Service struct {
 	terraformSvc terraformService
@@ -487,7 +485,7 @@ func (s *Service) ConvertIniContentToLegacyTerraformContent(
 			terraformResource := terraform.NewTerraformResource(
 				fmt.Sprintf(
 					"vault_encrypted_secret_%s",
-					strings.Replace(resourceName, "/", "_", -1),
+					strings.ReplaceAll(resourceName, "/", "_"),
 				),
 				"vault_encrypted_secret",
 			)
@@ -579,7 +577,7 @@ func (s *Service) ConvertIniContentToV1TerraformContent(
 			terraformResource := terraform.NewTerraformResource(
 				fmt.Sprintf(
 					"vaulted_vault_secret_%s",
-					strings.Replace(resourceName, "/", "_", -1),
+					strings.ReplaceAll(resourceName, "/", "_"),
 				),
 				"vaulted_vault_secret",
 			)

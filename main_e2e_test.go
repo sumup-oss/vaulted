@@ -336,11 +336,11 @@ func TestMvpWorkflow(t *testing.T) {
 // resources and you have to migrate them to new encryption-strategy terraform resources.
 // The flow is:
 // 1. legacy ini
-// 2. terraform migrate
-// TODO: When `terraform view` is added this will verify that the content is still decryptable and viewable.
-// 4. terraform new-resource
-// 5. terraform rotate
-// 6. terraform rekey
+// 2. terraform vault migrate
+// TODO: When `terraform vault view` is added this will verify that the content is still decryptable and viewable.
+// 4. terraform vault new-resource
+// 5. terraform vault rotate
+// 6. terraform vault rekey
 // TODO: Investigate why commands that are run do not output to neither stderr nor stdout.
 // Tests intentionally expect blank stdout/stderr, even though it's wrong,
 // to pass and later be able to correct to expected output.
@@ -396,10 +396,11 @@ myOtherKey=exampleother
 	regexMatches := vaultedTestUtils.OldTerraformRegex.FindAllStringSubmatch(string(legacyTfFileContent), -1)
 	assert.Equal(t, 2, len(regexMatches))
 
-	// NOTE: Start of `2. terraform migrate`
+	// NOTE: Start of `2. terraform vault migrate`
 	migratedTfFilePath := path.Join(tmpDir, "migrated.tf")
 	stdout, stderr, err = build.Run(
 		"terraform",
+		"vault",
 		"migrate",
 		"--private-key-path",
 		privKeyPath,
@@ -433,6 +434,7 @@ myOtherKey=exampleother
 	// NOTE: Append to the same output file as migrated one
 	stdout, stderr, err = build.Run(
 		"terraform",
+		"vault",
 		"new-resource",
 		"--public-key-path",
 		pubKeyPath,
@@ -458,9 +460,10 @@ myOtherKey=exampleother
 
 	rotatedTfFilePath := path.Join(tmpDir, "rotated.tf")
 
-	// NOTE: Start of `5. terraform rotate`
+	// NOTE: Start of `5. terraform vault rotate`
 	stdout, stderr, err = build.Run(
 		"terraform",
+		"vault",
 		"rotate",
 		"--public-key-path",
 		pubKeyPath,
@@ -487,9 +490,10 @@ myOtherKey=exampleother
 	_, newPrivKey := testutils.GenerateAndWritePrivateKey(t, tmpDir, "newpriv.key")
 	newPubKeyPath := testutils.GenerateAndWritePublicKey(t, tmpDir, "newpub.key", newPrivKey)
 
-	// NOTE: Start of `6. terraform rekey`
+	// NOTE: Start of `6. terraform vault rekey`
 	stdout, stderr, err = build.Run(
 		"terraform",
+		"vault",
 		"rekey",
 		"--new-public-key-path",
 		newPubKeyPath,
@@ -515,12 +519,12 @@ myOtherKey=exampleother
 // NOTE: Test the terraform workflow that is feasible when you're converting
 // "ini"-file based secrets to encrypted terraform resources.
 // The flow is:
-// 1. terraform ini
-// 2. terraform migrate
+// 1. terraform vault ini
+// 2. terraform vault migrate
 // TODO: When `terraform view` is added this will verify that the content is still decryptable and viewable.
-// 4. terraform new-resource
-// 5. terraform rotate
-// 6. terraform rekey
+// 4. terraform vault new-resource
+// 5. terraform vault rotate
+// 6. terraform vault rekey
 // TODO: Investigate why commands that are run do not output to neither stderr nor stdout.
 // Tests intentionally expect blank stdout/stderr, even though it's wrong,
 // to pass and later be able to correct to expected output.
@@ -556,6 +560,7 @@ myOtherKey=exampleother
 	iniTfFilePath := path.Join(tmpDir, "ini.tf")
 	stdout, stderr, err := build.Run(
 		"terraform",
+		"vault",
 		"ini",
 		"--public-key-path",
 		pubKeyPath,
@@ -575,10 +580,11 @@ myOtherKey=exampleother
 	regexMatches := vaultedTestUtils.NewTerraformRegex.FindAllStringSubmatch(string(iniTfFileContent), -1)
 	assert.Equal(t, 2, len(regexMatches))
 
-	// NOTE: Start of `2. terraform migrate`
+	// NOTE: Start of `2. terraform vault migrate`
 	migratedTfFilePath := path.Join(tmpDir, "migrated.tf")
 	stdout, stderr, err = build.Run(
 		"terraform",
+		"vault",
 		"migrate",
 		"--private-key-path",
 		privKeyPath,
@@ -612,6 +618,7 @@ myOtherKey=exampleother
 	// NOTE: Append to the same output file as migrated one
 	stdout, stderr, err = build.Run(
 		"terraform",
+		"vault",
 		"new-resource",
 		"--public-key-path",
 		pubKeyPath,
@@ -637,9 +644,10 @@ myOtherKey=exampleother
 
 	rotatedTfFilePath := path.Join(tmpDir, "rotated.tf")
 
-	// NOTE: Start of `5. terraform rotate`
+	// NOTE: Start of `5. terraform vault rotate`
 	stdout, stderr, err = build.Run(
 		"terraform",
+		"vault",
 		"rotate",
 		"--public-key-path",
 		pubKeyPath,
@@ -666,9 +674,10 @@ myOtherKey=exampleother
 	_, newPrivKey := testutils.GenerateAndWritePrivateKey(t, tmpDir, "newpriv.key")
 	newPubKeyPath := testutils.GenerateAndWritePublicKey(t, tmpDir, "newpub.key", newPrivKey)
 
-	// NOTE: Start of `6. terraform rekey`
+	// NOTE: Start of `6. terraform vault rekey`
 	stdout, stderr, err = build.Run(
 		"terraform",
+		"vault",
 		"rekey",
 		"--new-public-key-path",
 		newPubKeyPath,
