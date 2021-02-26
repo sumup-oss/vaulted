@@ -53,6 +53,10 @@ Change line format:
 
 ## Unreleased (master)
 
+### Removed
+
+* Commands from `legacy` sub-command are now removed. We're not using them internally. The migration from legacy to v1 secret format command(s) are there to help you transition ; Ref: https://github.com/sumup-oss/vaulted/pull/15
+
 ## v0.3.0
 
 ### Changed

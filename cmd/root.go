@@ -71,16 +71,6 @@ func NewRootCmd(
 
 	cmdInstance.AddCommand(
 		NewVersionCmd(osExecutor),
-		NewLegacyCmd(
-			osExecutor,
-			rsaSvc,
-			iniSvc,
-			encPassphraseSvc,
-			legacyEncContentSvc,
-			hclSvc,
-			terraformSvc,
-			terraformEncryptionMigrationSvc,
-		),
 		NewEncryptCommand(osExecutor, rsaSvc, encPassphraseSvc, encPayloadSvc),
 		NewDecryptCommand(osExecutor),
 		NewRotateCommand(osExecutor, rsaSvc, encPassphraseSvc, encPayloadSvc),
