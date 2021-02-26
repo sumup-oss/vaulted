@@ -17,13 +17,14 @@ package vault
 import (
 	"fmt"
 
+	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cobra"
 	"github.com/sumup-oss/go-pkgs/os"
+	"github.com/zclconf/go-cty/cty"
 
 	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
 	"github.com/sumup-oss/vaulted/internal/cli"
-	"github.com/sumup-oss/vaulted/pkg/terraform"
 	"github.com/sumup-oss/vaulted/pkg/vaulted"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
@@ -35,8 +36,6 @@ func NewNewResourceCommand(
 	rsaSvc external_interfaces.RsaService,
 	encryptedPassphraseSvc external_interfaces.EncryptedPassphraseService,
 	encryptedPayloadSvc external_interfaces.EncryptedPayloadService,
-	hclSvc external_interfaces.HclService,
-	tfSvc external_interfaces.TerraformService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
 		Use: "new-resource --public-key-path ./my-pubkey.pem " +
@@ -126,27 +125,19 @@ func NewNewResourceCommand(
 				fullResourceName = fmt.Sprintf("%s_%s", resourcePrefix, resourceName)
 			}
 
-			tfResource := terraform.NewTerraformResource(
-				fullResourceName,
-				"vaulted_vault_secret",
-			)
-			tfResource.Content["path"] = cmdInstance.Flag("path").Value.String()
-			tfResource.Content["payload_json"] = string(serializedEncryptedPayload)
+			block := hclwrite.NewBlock("resource", []string{"vaulted_vault_secret", fullResourceName})
+			blockBody := block.Body()
+			path := cmdInstance.Flag("path").Value.String()
+			blockBody.SetAttributeValue("path", cty.StringVal(path))
+			blockBody.SetAttributeValue("payload_json", cty.StringVal(string(serializedEncryptedPayload)))
 
-			hclFile, err := tfSvc.TerraformResourceToHCLfile(hclSvc, tfResource)
-			if err != nil {
-				return stacktrace.Propagate(
-					err,
-					"failed to convert terraform resource to HCL",
-				)
-			}
+			hclFile := hclwrite.NewEmptyFile()
+			hclFile.Body().AppendBlock(block)
 
 			return cli.WriteHCLout(
 				osExecutor,
 				outFilePath,
-				hclSvc,
 				hclFile,
-				tfSvc,
 			)
 		},
 	}

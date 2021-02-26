@@ -21,10 +21,8 @@ import (
 	"github.com/sumup-oss/go-pkgs/os/ostest"
 	"github.com/sumup-oss/vaulted/pkg/aes"
 	"github.com/sumup-oss/vaulted/pkg/base64"
-	"github.com/sumup-oss/vaulted/pkg/hcl"
 	"github.com/sumup-oss/vaulted/pkg/pkcs7"
 	"github.com/sumup-oss/vaulted/pkg/rsa"
-	"github.com/sumup-oss/vaulted/pkg/terraform"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
@@ -45,10 +43,8 @@ func TestNewNewResourceCmd(t *testing.T) {
 		encPassphraseSvc,
 		encContentSvc,
 	)
-	hclSvc := hcl.NewHclService()
-	tfSvc := terraform.NewTerraformService()
 
-	actual := NewNewResourceCommand(osExecutor, rsaSvc, encPassphraseSvc, encPayloadSvc, hclSvc, tfSvc)
+	actual := NewNewResourceCommand(osExecutor, rsaSvc, encPassphraseSvc, encPayloadSvc)
 
 	assert.Equal(
 		t,

@@ -32,13 +32,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/sumup-oss/go-pkgs/os"
 	"github.com/sumup-oss/go-pkgs/os/ostest"
-	theseusTestUtils "github.com/sumup-oss/go-pkgs/testutils"
+	gopkgsTestUtils "github.com/sumup-oss/go-pkgs/testutils"
 	"github.com/sumup-oss/vaulted/pkg/aes"
 	"github.com/sumup-oss/vaulted/pkg/base64"
-	"github.com/sumup-oss/vaulted/pkg/hcl"
 	"github.com/sumup-oss/vaulted/pkg/pkcs7"
 	"github.com/sumup-oss/vaulted/pkg/rsa"
-	"github.com/sumup-oss/vaulted/pkg/terraform"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
@@ -65,19 +63,15 @@ func TestNewResourceCmd_Execute(t *testing.T) {
 				encPassphraseSvc,
 				encContentSvc,
 			)
-			hclSvc := hcl.NewHclService()
-			tfSvc := terraform.NewTerraformService()
 
 			cmdInstance := NewNewResourceCommand(
 				osExecutor,
 				rsaSvc,
 				encPassphraseSvc,
 				encPayloadSvc,
-				hclSvc,
-				tfSvc,
 			)
 
-			_, err := theseusTestUtils.RunCommandInSameProcess(
+			_, err := gopkgsTestUtils.RunCommandInSameProcess(
 				cmdInstance,
 				[]string{},
 				outputBuff,
@@ -96,7 +90,7 @@ func TestNewResourceCmd_Execute(t *testing.T) {
 			"it prints encrypted passphrase in stdout and "+
 			"writes encrypted content at 'out' file path",
 		func(t *testing.T) {
-			tmpDir := theseusTestUtils.TestCwd(t, "vaulted")
+			tmpDir := gopkgsTestUtils.TestCwd(t, "vaulted")
 
 			outputBuff := &bytes.Buffer{}
 			realOsExecutor := &os.RealOsExecutor{}
@@ -137,8 +131,6 @@ func TestNewResourceCmd_Execute(t *testing.T) {
 				encPassphraseSvc,
 				encContentSvc,
 			)
-			hclSvc := hcl.NewHclService()
-			tfSvc := terraform.NewTerraformService()
 
 			outPathFlag := filepath.Join(tmpDir, "out.tf")
 			cmdInstance := NewNewResourceCommand(
@@ -146,8 +138,6 @@ func TestNewResourceCmd_Execute(t *testing.T) {
 				rsaSvc,
 				encPassphraseSvc,
 				encPayloadSvc,
-				hclSvc,
-				tfSvc,
 			)
 
 			pathArg := "secret/exampleapp/example"
@@ -161,7 +151,7 @@ func TestNewResourceCmd_Execute(t *testing.T) {
 				fmt.Sprintf("--resource-name=%s", resourceNameArg),
 			}
 
-			_, err = theseusTestUtils.RunCommandInSameProcess(
+			_, err = gopkgsTestUtils.RunCommandInSameProcess(
 				cmdInstance,
 				cmdArgs,
 				outputBuff,
@@ -173,7 +163,7 @@ func TestNewResourceCmd_Execute(t *testing.T) {
 			require.Nil(t, err)
 
 			regexMatches := testutils.NewTerraformRegex.FindAllStringSubmatch(string(outContent), -1)
-			assert.Equal(t, 1, len(regexMatches))
+			require.Equal(t, 1, len(regexMatches))
 
 			resourcePrefix := vaulted.SanitizeFilename(outPathFlag)
 			fullResourceName := fmt.Sprintf("%s_%s", resourcePrefix, resourceNameArg)

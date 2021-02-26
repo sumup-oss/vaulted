@@ -83,7 +83,6 @@ func NewRootCmd(
 			legacyEncContentSvc,
 			encPayloadSvc,
 			hclSvc,
-			terraformSvc,
 			terraformEncryptionMigrationSvc,
 		),
 	)

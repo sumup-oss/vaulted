@@ -19,7 +19,7 @@ import (
 )
 
 //nolint:lll
-var OldTerraformRegex = regexp.MustCompile(`(?m)"resource"\s+"vault_encrypted_secret"\s+"(?P<resource_name>\w+)"\s+{[\n]\s+"encrypted_data_json"\s+=\s+"(?P<encrypted_data_json>.+)"[\n]\s+"encrypted_passphrase"\s+=\s+"(?P<encrypted_passphrase>.+)"[\n]\s+"path"\s+=\s+"(?P<path>.+)"`)
-
-//nolint:lll
-var NewTerraformRegex = regexp.MustCompile(`(?m)"resource"\s+"vaulted_vault_secret"\s+"(?P<resource_name>\w+)"\s+{[\n]\s+"path"\s+=\s+"(?P<path>.+)"[\n]\s+"payload_json"\s+=\s+"(?P<payload_json>.+)[\n]}`)
+var (
+	NewTerraformRegex   = regexp.MustCompile(`(?m)resource\s+"vaulted_vault_secret"\s+"(?P<resource_name>\w+)"\s+{[\n]\s+path\s+=\s+"(?P<path>.+)"[\n]\s+payload_json\s+=\s+"(?P<payload_json>.+)[\n]}`)
+	VaultedPayloadRegex = regexp.MustCompile(`\$VED;1.0::(.+)::(.+)`)
+)

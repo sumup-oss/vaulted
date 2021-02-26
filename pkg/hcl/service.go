@@ -15,11 +15,9 @@
 package hcl
 
 import (
-	"io"
-
-	"github.com/hashicorp/hcl"
-	"github.com/hashicorp/hcl/hcl/ast"
-	"github.com/hashicorp/hcl/hcl/printer"
+	hclv2 "github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/palantir/stacktrace"
 )
 
 // Service is an ad-hoc abstraction
@@ -32,11 +30,19 @@ func NewHclService() *Service {
 }
 
 // Parse parses HCL or JSON marshaled bytes and return HCL AST.
-func (s *Service) Parse(src []byte) (*ast.File, error) {
-	return hcl.ParseBytes(src)
-}
+func (s *Service) Parse(src []byte) (*hclwrite.File, error) {
+	f, diags := hclwrite.ParseConfig(src, "", hclv2.Pos{Line: 1, Column: 1})
 
-// Fprint pretty-prints (writes) HCL specified `node` in specified `output`.
-func (s *Service) Fprint(output io.Writer, node ast.Node) error {
-	return printer.DefaultConfig.Fprint(output, node)
+	if diags.HasErrors() {
+		var errs []*Err
+		for _, diag := range diags {
+			errs = append(errs, NewErr(diag))
+		}
+
+		err := NewParseErr(errs)
+
+		return nil, stacktrace.Propagate(err, "failed to parse HCL")
+	}
+
+	return f, nil
 }

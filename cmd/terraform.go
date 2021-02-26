@@ -30,7 +30,6 @@ func NewTerraformCmd(
 	legacyEncryptedContentSvc external_interfaces.EncryptedContentService,
 	v1EncryptedPayloadSvc external_interfaces.EncryptedPayloadService,
 	hclSvc external_interfaces.HclService,
-	terraformSvc external_interfaces.TerraformService,
 	tfEncryptionMigrationSvc external_interfaces.TerraformEncryptionMigrationService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
@@ -51,7 +50,6 @@ func NewTerraformCmd(
 			legacyEncryptedContentSvc,
 			v1EncryptedPayloadSvc,
 			hclSvc,
-			terraformSvc,
 			tfEncryptionMigrationSvc,
 		),
 	)

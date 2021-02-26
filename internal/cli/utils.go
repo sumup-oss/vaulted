@@ -18,26 +18,22 @@ import (
 	"fmt"
 	stdOs "os"
 
-	"github.com/hashicorp/hcl/hcl/ast"
+	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/palantir/stacktrace"
 	"github.com/sumup-oss/go-pkgs/os"
-
-	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
 )
 
 func WriteHCLout(
 	osExecutor os.OsExecutor,
 	outFilePath string,
-	hclSvc external_interfaces.HclService,
-	hclFile *ast.File,
-	tfSvc external_interfaces.TerraformService,
+	hclFile *hclwrite.File,
 ) error {
 	var err error
 
 	if outFilePath == "" {
-		fmt.Fprintln(osExecutor.Stdout(), "Terraform HCL below:")
+		_, _ = fmt.Fprintln(osExecutor.Stdout(), "Terraform HCL below:")
 
-		err = tfSvc.WriteHCLfile(hclSvc, hclFile, osExecutor.Stdout())
+		_, err = osExecutor.Stdout().Write(hclFile.Bytes())
 		if err != nil {
 			return stacktrace.Propagate(
 				err,
@@ -45,31 +41,25 @@ func WriteHCLout(
 			)
 		}
 	} else {
-		outFile, err := osExecutor.OpenFile(
-			outFilePath,
-			stdOs.O_APPEND|stdOs.O_CREATE|stdOs.O_WRONLY,
-			0644,
-		)
+		srcFd, err := osExecutor.OpenFile(outFilePath, stdOs.O_APPEND|stdOs.O_CREATE|stdOs.O_RDWR, 0755)
 		if err != nil {
-			return stacktrace.Propagate(
-				err,
-				"failed to open file at out file path",
-			)
+			return stacktrace.Propagate(err, "failed to open/create file at out file path")
 		}
+		defer srcFd.Close()
 
-		_, err = outFile.WriteString("\n")
-		if err != nil {
-			return stacktrace.Propagate(
-				err,
-				"failed to write newline at out file path",
-			)
-		}
-
-		err = tfSvc.WriteHCLfile(hclSvc, hclFile, outFile)
+		_, err = srcFd.Write(hclFile.Bytes())
 		if err != nil {
 			return stacktrace.Propagate(
 				err,
 				"failed to write terraform HCL at out file path",
+			)
+		}
+
+		err = srcFd.Sync()
+		if err != nil {
+			return stacktrace.Propagate(
+				err,
+				"failed to sync terraform HCL writes to  out file path file",
 			)
 		}
 	}

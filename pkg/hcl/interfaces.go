@@ -15,15 +15,9 @@
 package hcl
 
 import (
-	"io"
-
-	"github.com/hashicorp/hcl/hcl/ast"
+	"github.com/hashicorp/hcl/v2/hclwrite"
 )
 
-type Printer interface {
-	Fprint(output io.Writer, node ast.Node) error
-}
-
 type Parser interface {
-	Parse(src []byte) (*ast.File, error)
+	Parse(src []byte) (*hclwrite.File, error)
 }

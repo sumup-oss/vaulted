@@ -15,19 +15,10 @@
 package terraform
 
 import (
-	"encoding/json"
-	"errors"
-	"io"
-
-	"github.com/hashicorp/hcl/hcl/ast"
+	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/palantir/stacktrace"
 
 	"github.com/sumup-oss/vaulted/pkg/hcl"
-)
-
-var (
-	errResourceWithEmptyName = errors.New("invalid terraform resource with empty name")
-	errResourceWithEmptyType = errors.New("invalid terraform resource with empty type")
 )
 
 type Service struct{}
@@ -36,116 +27,27 @@ func NewTerraformService() *Service {
 	return &Service{}
 }
 
-func (s *Service) WriteHCLfile(hclPrinter hcl.Printer, hclFile *ast.File, output io.Writer) error {
-	err := hclPrinter.Fprint(output, hclFile)
-	if err != nil {
-		return stacktrace.Propagate(
-			err,
-			"failed to write HCL to file",
-		)
-	}
-
-	return nil
-}
-
-func (s *Service) TerraformContentToHCLfile(hclParser hcl.Parser, terraformContent *Content) (*ast.File, error) {
-	// NOTE: Nothing to write, return early
-	if len(terraformContent.ResourcesByName) < 1 {
-		return &ast.File{}, nil
-	}
-	// NOTE: Map of "HCL type", "HCL type name", "HCL resource name", "HCL resource key", "HCL resource value".
-	terraformMap := map[string]map[string]map[string]map[string]string{}
-	terraformMap["resource"] = map[string]map[string]map[string]string{}
-
-	for _, resource := range terraformContent.ResourcesByName {
-		terraformMap["resource"][resource.Type] = map[string]map[string]string{}
-	}
-
-	for resourceName, resource := range terraformContent.ResourcesByName {
-		terraformMap["resource"][resource.Type][resourceName] = resource.Content
-	}
-
-	terraformMapBytes, err := json.Marshal(terraformMap)
-	if err != nil {
-		return nil, stacktrace.Propagate(
-			err,
-			"failed to marshal in JSON terraform content",
-		)
-	}
-
-	hclAST, err := hclParser.Parse(terraformMapBytes)
-	if err != nil {
-		return nil, stacktrace.Propagate(
-			err,
-			"failed to parse JSON marshaled terraform content as HCL",
-		)
-	}
-
-	return hclAST, nil
-}
-
-func (s *Service) TerraformResourceToHCLfile(hclParser hcl.Parser, resource Resource) (*ast.File, error) {
-	if resource.Name == "" {
-		return nil, errResourceWithEmptyName
-	}
-
-	if resource.Type == "" {
-		return nil, errResourceWithEmptyType
-	}
-
-	resourceContentByName := map[string]map[string]string{}
-
-	resourceContentByName[resource.Name] = resource.Content
-
-	// NOTE: Map of "HCL type", "HCL type name", "HCL resource name", "HCL resource key", "HCL resource value".
-	terraformMap := map[string]map[string]map[string]map[string]string{}
-	terraformMap["resource"] = map[string]map[string]map[string]string{
-		resource.Type: resourceContentByName,
-	}
-
-	terraformMapBytes, err := json.Marshal(terraformMap)
-	if err != nil {
-		return nil, stacktrace.Propagate(
-			err,
-			"failed to marshal in JSON terraform content",
-		)
-	}
-
-	hclAST, err := hclParser.Parse(terraformMapBytes)
-	if err != nil {
-		return nil, stacktrace.Propagate(
-			err,
-			"failed to parse JSON marshaled terraform content as HCL",
-		)
-	}
-
-	return hclAST, nil
-}
-
 func (s *Service) ModifyInPlaceHclAst(
-	hclParser hcl.Parser,
+	parser hcl.Parser,
 	hclBytes []byte,
-	objectItemVisitorFunc func(item *ast.ObjectItem) error,
-) (*ast.File, error) {
-	hclAst, err := hclParser.Parse(hclBytes)
+	blockItemVisitorFunc func(block *hclwrite.Block) error,
+) (*hclwrite.File, error) {
+	f, err := parser.Parse(hclBytes)
 	if err != nil {
-		return nil, stacktrace.Propagate(
-			err,
-			"failed to parse HCL payload",
-		)
+		return nil, stacktrace.Propagate(err, "failed to parse HCL")
 	}
 
-	fileObjectList, ok := hclAst.Node.(*ast.ObjectList)
-	if !ok {
-		return nil, stacktrace.NewError("HCL file does not have a list of resources")
+	body := f.Body()
+	if body == nil {
+		return nil, stacktrace.NewError("empty body")
 	}
 
-	for _, item := range fileObjectList.Items {
-		err = objectItemVisitorFunc(item)
+	for _, b := range body.Blocks() {
+		err := blockItemVisitorFunc(b)
 		if err != nil {
-			return nil, err
+			return nil, stacktrace.Propagate(err, "block item visitor failed")
 		}
 	}
 
-	return hclAst, nil
+	return f, nil
 }

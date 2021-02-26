@@ -19,11 +19,10 @@ import (
 	"io"
 
 	goIni "github.com/go-ini/ini"
-	"github.com/hashicorp/hcl/hcl/ast"
+	"github.com/hashicorp/hcl/v2/hclwrite"
 
 	"github.com/sumup-oss/vaulted/pkg/hcl"
 	"github.com/sumup-oss/vaulted/pkg/ini"
-	"github.com/sumup-oss/vaulted/pkg/terraform"
 	"github.com/sumup-oss/vaulted/pkg/terraform_encryption_migration"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
@@ -31,7 +30,6 @@ import (
 )
 
 type HclService interface {
-	hcl.Printer
 	hcl.Parser
 }
 
@@ -71,27 +69,14 @@ type EncryptedContentService interface {
 	) (*content.Content, error)
 }
 
-type TerraformService interface {
-	TerraformContentToHCLfile(hclParser hcl.Parser, terraformContent *terraform.Content) (*ast.File, error)
-	WriteHCLfile(hclPrinter hcl.Printer, hclFile *ast.File, output io.Writer) error
-	TerraformResourceToHCLfile(hclParser hcl.Parser, resource terraform.Resource) (*ast.File, error)
-}
-
 type TerraformEncryptionMigrationService interface {
-	ConvertIniContentToLegacyTerraformContent(
-		passphraseLength int,
-		iniContent *ini.Content,
-		pubKey *stdRsa.PublicKey,
-		encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
-		encryptedContentSvc terraform_encryption_migration.EncryptedContentService,
-	) (*terraform.Content, error)
-	ConvertIniContentToV1TerraformContent(
+	ConvertIniContentToV1ResourceHCL(
 		passphraseLength int,
 		iniContent *ini.Content,
 		pubKey *stdRsa.PublicKey,
 		encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
 		encryptedPayloadSvc terraform_encryption_migration.EncryptedPayloadService,
-	) (*terraform.Content, error)
+	) (*hclwrite.File, error)
 	MigrateEncryptedTerraformResourceHcl(
 		hclParser hcl.Parser,
 		hclBytes []byte,
@@ -100,7 +85,7 @@ type TerraformEncryptionMigrationService interface {
 		legacyEncryptedContentSvc terraform_encryption_migration.EncryptedContentService,
 		encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
 		encryptedPayloadSvc terraform_encryption_migration.EncryptedPayloadService,
-	) (*ast.File, error)
+	) (*hclwrite.File, error)
 	RotateOrRekeyEncryptedTerraformResourceHcl(
 		hclParser hcl.Parser,
 		hclBytes []byte,
@@ -108,7 +93,7 @@ type TerraformEncryptionMigrationService interface {
 		pubKey *stdRsa.PublicKey,
 		encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
 		encryptedPayloadSvc terraform_encryption_migration.EncryptedPayloadService,
-	) (*ast.File, error)
+	) (*hclwrite.File, error)
 }
 
 type RsaService interface {

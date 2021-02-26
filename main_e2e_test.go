@@ -26,7 +26,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/sumup-oss/go-pkgs/os"
 	"github.com/sumup-oss/go-pkgs/testutils"
-	theseusTestUtils "github.com/sumup-oss/go-pkgs/testutils"
+	gopkgsTestUtils "github.com/sumup-oss/go-pkgs/testutils"
 	"github.com/sumup-oss/vaulted/internal/e2e"
 	vaultedTestUtils "github.com/sumup-oss/vaulted/pkg/testutils"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
@@ -61,7 +61,7 @@ func TestMain(m *testing.M) {
 func TestMvpWorkflow(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := theseusTestUtils.TestDir(t, "vaulted")
+	tmpDir := gopkgsTestUtils.TestDir(t, "vaulted")
 	defer stdOs.RemoveAll(tmpDir)
 
 	// NOTE: Create a build before switching dirs
@@ -69,7 +69,7 @@ func TestMvpWorkflow(t *testing.T) {
 
 	// NOTE: Switch to tmp dir to make sure we're not
 	// relying on content inside the non-temporary dir (previous cwd).
-	theseusTestUtils.TestChdir(t, tmpDir)
+	gopkgsTestUtils.TestChdir(t, tmpDir)
 
 	privKeyPath, privKey := testutils.GenerateAndWritePrivateKey(t, tmpDir, "priv.key")
 	pubKeyPath := testutils.GenerateAndWritePublicKey(t, tmpDir, "pub.key", privKey)
@@ -347,7 +347,7 @@ func TestMvpWorkflow(t *testing.T) {
 func TestV1TerraformWorkflow(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := theseusTestUtils.TestDir(t, "vaulted")
+	tmpDir := gopkgsTestUtils.TestDir(t, "vaulted")
 	defer stdOs.RemoveAll(tmpDir)
 
 	// NOTE: Create a build before switching dirs
@@ -355,7 +355,7 @@ func TestV1TerraformWorkflow(t *testing.T) {
 
 	// NOTE: Switch to tmp dir to make sure we're not
 	// relying on content inside the non-temporary dir (previous cwd).
-	theseusTestUtils.TestChdir(t, tmpDir)
+	gopkgsTestUtils.TestChdir(t, tmpDir)
 
 	privKeyPath, privKey := testutils.GenerateAndWritePrivateKey(t, tmpDir, "priv.key")
 	pubKeyPath := testutils.GenerateAndWritePublicKey(t, tmpDir, "pub.key", privKey)
@@ -474,9 +474,9 @@ myOtherKey=exampleother
 		"--out",
 		rotatedTfFilePath,
 	)
-	require.Nil(t, err)
 	assert.Equal(t, "", stdout)
 	assert.Equal(t, "", stderr)
+	require.Nil(t, err)
 
 	rotatedTfFileContent, err := osExecutor.ReadFile(rotatedTfFilePath)
 	require.Nil(t, err)

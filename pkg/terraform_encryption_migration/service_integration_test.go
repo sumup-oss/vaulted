@@ -19,9 +19,9 @@ import (
 	stdRsa "crypto/rsa"
 	"errors"
 	"fmt"
+	"regexp"
 	"testing"
 
-	"github.com/hashicorp/hcl/hcl/ast"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -29,13 +29,12 @@ import (
 	"github.com/sumup-oss/vaulted/pkg/aes"
 	"github.com/sumup-oss/vaulted/pkg/base64"
 	"github.com/sumup-oss/vaulted/pkg/hcl"
-	"github.com/sumup-oss/vaulted/pkg/hcl/test"
 	"github.com/sumup-oss/vaulted/pkg/ini"
 	"github.com/sumup-oss/vaulted/pkg/pkcs7"
 	"github.com/sumup-oss/vaulted/pkg/rsa"
 	"github.com/sumup-oss/vaulted/pkg/terraform"
+	"github.com/sumup-oss/vaulted/pkg/testutils"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
-	testContent "github.com/sumup-oss/vaulted/pkg/vaulted/content/test"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
 	testPassphrase "github.com/sumup-oss/vaulted/pkg/vaulted/passphrase/test"
@@ -43,381 +42,9 @@ import (
 	testPayload "github.com/sumup-oss/vaulted/pkg/vaulted/payload/test"
 )
 
-func TestService_ConvertIniContentToLegacyTerraformContent(t *testing.T) {
+func TestService_ConvertIniContentToV1ResourceHCL(t *testing.T) {
 	t.Run(
-		"when `iniContent` has no sections, it returns empty terraform content",
-		func(t *testing.T) {
-			t.Parallel()
-
-			privKey, actualErr := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, actualErr)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			iniContent := ini.NewIniContent()
-
-			encryptedPassphraseSvc := &testPassphrase.MockEncryptedPassphraseService{}
-			encryptedContentSvc := &testContent.MockEncryptedContentService{}
-
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToLegacyTerraformContent(
-				16,
-				iniContent,
-				&privKey.PublicKey,
-				encryptedPassphraseSvc,
-				encryptedContentSvc,
-			)
-
-			require.Nil(t, actualErr)
-
-			assert.Equal(t, 0, len(actualReturn.ResourcesByName))
-		},
-	)
-
-	t.Run(
-		"when `iniContent` has 1 section, but no values in the section, it returns empty terraform content",
-		func(t *testing.T) {
-			t.Parallel()
-
-			privKey, actualErr := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, actualErr)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			iniSection := ini.NewIniSection("section_a")
-			iniSection.Values = []*ini.SectionValue{}
-
-			iniContent := ini.NewIniContent()
-			iniContent.AddSection(iniSection)
-
-			assert.Equal(t, 1, len(iniContent.SectionsByName))
-
-			encryptedPassphraseSvc := &testPassphrase.MockEncryptedPassphraseService{}
-			encryptedContentSvc := &testContent.MockEncryptedContentService{}
-
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToLegacyTerraformContent(
-				16,
-				iniContent,
-				&privKey.PublicKey,
-				encryptedPassphraseSvc,
-				encryptedContentSvc,
-			)
-
-			require.Nil(t, actualErr)
-
-			assert.Equal(t, 0, len(actualReturn.ResourcesByName))
-		},
-	)
-
-	t.Run(
-		"when `iniContent` has at least 1 section, but json marshalling of section value fails, "+
-			"it returns an error",
-		func(t *testing.T) {
-			t.Parallel()
-
-			privKey, actualErr := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, actualErr)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			iniSection := ini.NewIniSection("section_a")
-			// NOTE: Section value is not JSON serializable.
-			// It's expected to be the cause of the JSON marshal error.
-			sectionValue := ini.NewIniSectionValue("key_a", make(chan interface{}))
-
-			iniSection.Values = []*ini.SectionValue{sectionValue}
-
-			iniContent := ini.NewIniContent()
-			iniContent.AddSection(iniSection)
-
-			assert.Equal(t, 1, len(iniContent.SectionsByName))
-
-			encryptedPassphraseSvc := &testPassphrase.MockEncryptedPassphraseService{}
-			encryptedContentSvc := &testContent.MockEncryptedContentService{}
-
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToLegacyTerraformContent(
-				16,
-				iniContent,
-				&privKey.PublicKey,
-				encryptedPassphraseSvc,
-				encryptedContentSvc,
-			)
-
-			require.Nil(t, actualReturn)
-
-			assert.Contains(
-				t,
-				actualErr.Error(),
-				fmt.Sprintf(
-					"failed to marshal in JSON value for section: %s, key: %s",
-					iniSection.Name,
-					sectionValue.KeyName,
-				),
-			)
-		},
-	)
-
-	t.Run(
-		"when `iniContent` has at least 1 section, but generating of random passphrase fails, "+
-			"it returns an error",
-		func(t *testing.T) {
-			t.Parallel()
-
-			privKey, actualErr := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, actualErr)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			iniSection := ini.NewIniSection("section_a")
-			sectionValue := ini.NewIniSectionValue("key_a", "value_a")
-
-			iniSection.Values = []*ini.SectionValue{sectionValue}
-
-			iniContent := ini.NewIniContent()
-			iniContent.AddSection(iniSection)
-
-			assert.Equal(t, 1, len(iniContent.SectionsByName))
-
-			fakeError := errors.New("fakeGeneratePassphraseError")
-			encryptedPassphraseSvc := &testPassphrase.MockEncryptedPassphraseService{}
-			encryptedPassphraseSvc.On(
-				"GeneratePassphrase",
-				16,
-			).Return(nil, fakeError)
-
-			encryptedContentSvc := &testContent.MockEncryptedContentService{}
-
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToLegacyTerraformContent(
-				16,
-				iniContent,
-				&privKey.PublicKey,
-				encryptedPassphraseSvc,
-				encryptedContentSvc,
-			)
-
-			require.Nil(t, actualReturn)
-
-			assert.Contains(
-				t,
-				actualErr.Error(),
-				"failed to generate random passphrase",
-			)
-		},
-	)
-
-	t.Run(
-		"when `iniContent` has at least 1 section, but encrypting the random passphrase fails, "+
-			"it returns an error",
-		func(t *testing.T) {
-			t.Parallel()
-
-			privKey, actualErr := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, actualErr)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			iniSection := ini.NewIniSection("section_a")
-			sectionValue := ini.NewIniSectionValue("key_a", "value_a")
-
-			iniSection.Values = []*ini.SectionValue{sectionValue}
-
-			iniContent := ini.NewIniContent()
-			iniContent.AddSection(iniSection)
-
-			assert.Equal(t, 1, len(iniContent.SectionsByName))
-
-			passphrase := &passphrase.Passphrase{
-				Content: []byte("1234"),
-			}
-
-			encryptedPassphraseSvc := &testPassphrase.MockEncryptedPassphraseService{}
-			encryptedPassphraseSvc.On(
-				"GeneratePassphrase",
-				16,
-			).Return(passphrase, nil)
-
-			fakeError := errors.New("fakeEncryptError")
-
-			encryptedPassphraseSvc.On(
-				"Encrypt",
-				&privKey.PublicKey,
-				passphrase,
-			).Return(nil, fakeError)
-
-			encryptedContentSvc := &testContent.MockEncryptedContentService{}
-
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToLegacyTerraformContent(
-				16,
-				iniContent,
-				&privKey.PublicKey,
-				encryptedPassphraseSvc,
-				encryptedContentSvc,
-			)
-
-			require.Nil(t, actualReturn)
-
-			assert.Contains(
-				t,
-				actualErr.Error(),
-				fmt.Sprintf(
-					"failed to encrypt generated passphrase with specified public key",
-				),
-			)
-		},
-	)
-
-	t.Run(
-		"when `iniContent` has at least 1 section, but encrypting the section value's content fails, "+
-			"it returns an error",
-		func(t *testing.T) {
-			t.Parallel()
-
-			privKey, actualErr := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, actualErr)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			iniSection := ini.NewIniSection("section_a")
-			sectionValue := ini.NewIniSectionValue("key_a", "value_a")
-
-			iniSection.Values = []*ini.SectionValue{sectionValue}
-
-			iniContent := ini.NewIniContent()
-			iniContent.AddSection(iniSection)
-
-			assert.Equal(t, 1, len(iniContent.SectionsByName))
-
-			b64Svc := base64.NewBase64Service()
-			osExecutor := ostest.NewFakeOsExecutor(t)
-
-			rsaSvc := rsa.NewRsaService(osExecutor)
-
-			encryptedPassphraseSvc := passphrase.NewEncryptedPassphraseService(
-				b64Svc,
-				rsaSvc,
-			)
-
-			fakeError := errors.New("fakeEncryptError")
-			encryptedContentSvc := &testContent.MockEncryptedContentService{}
-			encryptedContentSvc.On(
-				"Encrypt",
-				mock.AnythingOfType("*passphrase.Passphrase"),
-				mock.AnythingOfType("*content.Content"),
-			).Return(nil, fakeError)
-
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToLegacyTerraformContent(
-				16,
-				iniContent,
-				&privKey.PublicKey,
-				encryptedPassphraseSvc,
-				encryptedContentSvc,
-			)
-
-			require.Nil(t, actualReturn)
-
-			assert.Contains(
-				t,
-				actualErr.Error(),
-				fmt.Sprintf(
-					"failed to encrypt content from section: %s, key: %s",
-					iniSection.Name,
-					sectionValue.KeyName,
-				),
-			)
-		},
-	)
-
-	t.Run(
-		"when `iniContent` has at least 1 section and generating random passphrase, encryption of "+
-			"passphrase and content succeeds, "+
-			"it returns terraform content with at least 1 terraform resource added",
-		func(t *testing.T) {
-			t.Parallel()
-
-			privKey, actualErr := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, actualErr)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			iniSection := ini.NewIniSection("section_a")
-			sectionValue := ini.NewIniSectionValue("key_a", "value_a")
-
-			iniSection.Values = []*ini.SectionValue{sectionValue}
-
-			iniContent := ini.NewIniContent()
-			iniContent.AddSection(iniSection)
-
-			assert.Equal(t, 1, len(iniContent.SectionsByName))
-
-			b64Svc := base64.NewBase64Service()
-			osExecutor := ostest.NewFakeOsExecutor(t)
-
-			rsaSvc := rsa.NewRsaService(osExecutor)
-
-			encryptedPassphraseSvc := passphrase.NewEncryptedPassphraseService(
-				b64Svc,
-				rsaSvc,
-			)
-
-			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-			encryptedContentSvc := content.NewLegacyEncryptedContentService(b64Svc, aesSvc)
-
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToLegacyTerraformContent(
-				16,
-				iniContent,
-				&privKey.PublicKey,
-				encryptedPassphraseSvc,
-				encryptedContentSvc,
-			)
-
-			require.Nil(t, actualErr)
-
-			assert.Equal(t, 1, len(actualReturn.ResourcesByName))
-
-			resourceKey := fmt.Sprintf(
-				"vault_encrypted_secret_%s_%s",
-				iniSection.Name,
-				sectionValue.KeyName,
-			)
-			actualResource := actualReturn.ResourcesByName[resourceKey]
-
-			assert.NotNil(t, actualResource)
-			assert.Equal(t, resourceKey, actualResource.Name)
-			assert.Equal(t, "vault_encrypted_secret", actualResource.Type)
-			assert.Equal(
-				t,
-				fmt.Sprintf(
-					"secret/%s/%s",
-					iniSection.Name,
-					sectionValue.KeyName,
-				),
-				actualResource.Content["path"],
-			)
-
-			assert.NotEqual(
-				t,
-				"",
-				actualResource.Content["encrypted_data_json"],
-			)
-
-			assert.NotEqual(
-				t,
-				"",
-				actualResource.Content["encrypted_passphrase"],
-			)
-		},
-	)
-}
-
-func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
-	t.Run(
-		"when `iniContent` has no sections, it returns empty terraform content",
+		"when `iniContent` has no sections, it returns empty HCL",
 		func(t *testing.T) {
 			t.Parallel()
 
@@ -432,7 +59,7 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 			encryptedPassphraseSvc := &testPassphrase.MockEncryptedPassphraseService{}
 			encryptedPayloadSvc := &testPayload.MockEncryptedPayloadService{}
 
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1TerraformContent(
+			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1ResourceHCL(
 				32,
 				iniContent,
 				&privKey.PublicKey,
@@ -442,13 +69,13 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 
 			require.Nil(t, actualErr)
 
-			assert.Equal(t, 0, len(actualReturn.ResourcesByName))
+			assert.Equal(t, "", string(actualReturn.Bytes()))
 		},
 	)
 
 	t.Run(
 		"when `iniContent` has 1 section, but no values in the section, "+
-			"it returns empty terraform content",
+			"it returns empty HCL",
 		func(t *testing.T) {
 			t.Parallel()
 
@@ -469,7 +96,7 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 			encryptedPassphraseSvc := &testPassphrase.MockEncryptedPassphraseService{}
 			encryptedPayloadSvc := &testPayload.MockEncryptedPayloadService{}
 
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1TerraformContent(
+			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1ResourceHCL(
 				32,
 				iniContent,
 				&privKey.PublicKey,
@@ -479,7 +106,7 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 
 			require.Nil(t, actualErr)
 
-			assert.Equal(t, 0, len(actualReturn.ResourcesByName))
+			assert.Equal(t, "", string(actualReturn.Bytes()))
 		},
 	)
 
@@ -510,7 +137,7 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 			encryptedPassphraseSvc := &testPassphrase.MockEncryptedPassphraseService{}
 			encryptedPayloadSvc := &testPayload.MockEncryptedPayloadService{}
 
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1TerraformContent(
+			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1ResourceHCL(
 				32,
 				iniContent,
 				&privKey.PublicKey,
@@ -563,7 +190,7 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 
 			encryptedPayloadSvc := &testPayload.MockEncryptedPayloadService{}
 
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1TerraformContent(
+			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1ResourceHCL(
 				32,
 				iniContent,
 				&privKey.PublicKey,
@@ -621,7 +248,7 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 				mock.AnythingOfType("*payload.Payload"),
 			).Return(nil, fakeError)
 
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1TerraformContent(
+			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1ResourceHCL(
 				32,
 				iniContent,
 				&privKey.PublicKey,
@@ -646,7 +273,7 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 	t.Run(
 		"when `iniContent` has at least 1 section and generating random passphrase, encryption of "+
 			"passphrase and content succeeds, "+
-			"it returns terraform content with at least 1 terraform resource added",
+			"it returns HCL with at least 1 terraform resource added",
 		func(t *testing.T) {
 			t.Parallel()
 
@@ -684,7 +311,7 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 				encryptedContentSvc,
 			)
 
-			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1TerraformContent(
+			actualReturn, actualErr := tfEncMigrationSvc.ConvertIniContentToV1ResourceHCL(
 				32,
 				iniContent,
 				&privKey.PublicKey,
@@ -693,34 +320,26 @@ func TestService_ConvertIniContentToV1TerraformContent(t *testing.T) {
 			)
 
 			require.Nil(t, actualErr)
+			require.NotNil(t, actualReturn)
 
-			assert.Equal(t, 1, len(actualReturn.ResourcesByName))
+			actualReturnString := string(actualReturn.Bytes())
 
 			resourceKey := fmt.Sprintf(
 				"vaulted_vault_secret_%s_%s",
 				iniSection.Name,
 				sectionValue.KeyName,
 			)
-			actualResource := actualReturn.ResourcesByName[resourceKey]
-
-			assert.NotNil(t, actualResource)
-			assert.Equal(t, resourceKey, actualResource.Name)
-			assert.Equal(t, "vaulted_vault_secret", actualResource.Type)
-			assert.Equal(
-				t,
-				fmt.Sprintf(
-					"secret/%s/%s",
-					iniSection.Name,
-					sectionValue.KeyName,
-				),
-				actualResource.Content["path"],
+			path := fmt.Sprintf(
+				"secret/%s/%s",
+				iniSection.Name,
+				sectionValue.KeyName,
 			)
 
-			assert.NotEqual(
-				t,
-				"",
-				actualResource.Content["payload_json"],
-			)
+			expectedRegex := fmt.Sprintf(`resource "vaulted_vault_secret" "%s" {
+  path         = "%s"
+  payload_json = "\$VED;1.0::(.+)::(.+)"
+}\n`, resourceKey, path)
+			assert.Regexp(t, regexp.MustCompile(expectedRegex), actualReturnString)
 		},
 	)
 }
@@ -768,64 +387,7 @@ func TestService_MigrateEncryptedTerraformResourceHcl(t *testing.T) {
 			)
 			require.Nil(t, actualReturn)
 
-			assert.Contains(t, actualErr.Error(), "failed to parse HCL payload")
-		},
-	)
-
-	t.Run(
-		"when succeeding to parse 'hclBytes', "+
-			"but HCL parsed file does not contain a list of HCL objects, "+
-			"it returns an error",
-		func(t *testing.T) {
-			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, err)
-
-			hclBytesArg := []byte("{ invalid }")
-
-			hclParserArg := &test.MockHclParser{}
-
-			// NOTE: Simulating wrong behavior of HCL parser is tricky,
-			// instead mock the HCL parser to return a specific AST.
-			fakeHclAst := &ast.File{
-				Node: &ast.ObjectItem{},
-			}
-			hclParserArg.On("Parse", hclBytesArg).Return(fakeHclAst, nil)
-
-			b64Svc := base64.NewBase64Service()
-			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-
-			legacyEncryptedContentSvcArg := content.NewLegacyEncryptedContentService(
-				b64Svc,
-				aesSvc,
-			)
-
-			osExecutor := ostest.NewFakeOsExecutor(t)
-
-			encryptedPassphraseSvcArg := passphrase.NewEncryptedPassphraseService(
-				b64Svc,
-				rsa.NewRsaService(osExecutor),
-			)
-			encryptedPayloadSvcArg := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encryptedPassphraseSvcArg,
-				content.NewLegacyEncryptedContentService(b64Svc, aesSvc),
-			)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			actualReturn, actualErr := tfEncMigrationSvc.MigrateEncryptedTerraformResourceHcl(
-				hclParserArg,
-				hclBytesArg,
-				privKey,
-				&privKey.PublicKey,
-				legacyEncryptedContentSvcArg,
-				encryptedPassphraseSvcArg,
-				encryptedPayloadSvcArg,
-			)
-			require.Nil(t, actualReturn)
-
-			assert.Contains(t, actualErr.Error(), "HCL file does not have a list of resources")
+			assert.Contains(t, actualErr.Error(), "failed to parse HCL")
 		},
 	)
 
@@ -841,11 +403,11 @@ func TestService_MigrateEncryptedTerraformResourceHcl(t *testing.T) {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vault_generic_secret" "mysecret" {
-	path = "secret/example"
-	data_json = "{ 'foo': 'bar' }"
-}
-`)
+	resource "vault_generic_secret" "mysecret" {
+		path = "secret/example"
+		data_json = "{ 'foo': 'bar' }"
+	}
+	`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -885,33 +447,7 @@ resource "vault_generic_secret" "mysecret" {
 			)
 			require.Nil(t, actualErr)
 
-			assert.Equal(t, expectedReturn, actualReturn)
-
-			expectedReturnObjList, ok := expectedReturn.Node.(*ast.ObjectList)
-			require.True(t, ok)
-
-			actualReturnObjList, ok := actualReturn.Node.(*ast.ObjectList)
-			require.True(t, ok)
-
-			assert.Equal(t, expectedReturnObjList, actualReturnObjList)
-
-			assert.Equal(t, 1, len(actualReturnObjList.Items))
-
-			expectedReturnObjListItem := expectedReturnObjList.Items[0]
-			actualReturnObjListItem := actualReturnObjList.Items[0]
-
-			assert.Equal(t, expectedReturnObjListItem, actualReturnObjListItem)
-
-			expectedReturnItemValObject, ok := expectedReturnObjListItem.Val.(*ast.ObjectType)
-			require.True(t, ok)
-
-			actualReturnItemValObject, ok := actualReturnObjListItem.Val.(*ast.ObjectType)
-			require.True(t, ok)
-
-			assert.Equal(t, expectedReturnItemValObject, actualReturnItemValObject)
-
-			assert.Equal(t, expectedReturnItemValObject.List, actualReturnItemValObject.List)
-			assert.Equal(t, expectedReturnItemValObject.List.Items, actualReturnItemValObject.List.Items)
+			assert.Equal(t, expectedReturn.Bytes(), actualReturn.Bytes())
 		},
 	)
 
@@ -963,7 +499,7 @@ resource "vault_generic_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to parse HCL payload",
+				"failed to parse HCL",
 			)
 		},
 	)
@@ -980,10 +516,10 @@ resource "vault_generic_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = ""
-}`)
+	resource "vault_encrypted_secret" "mysecret" {
+		path = "secret/example"
+		encrypted_passphrase = ""
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -1023,8 +559,7 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"HCL resource `vault_encrypted_secret` `\"mysecret\"` content is "+
-					"likely malformed. Expected exactly 3 key-value pairs",
+				"failed to read `encrypted_data_json` attr value for `vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1041,11 +576,11 @@ resource "vault_encrypted_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	1 = "1234"
-	encrypted_passphrase = "a1b2c3d4"
-	encrypted_data_json = "a1b2c3d4"
-}`)
+	resource "vault_encrypted_secret" "mysecret" {
+		1 = "1234"
+		encrypted_passphrase = "a1b2c3d4"
+		encrypted_data_json = "a1b2c3d4"
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -1085,69 +620,7 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to parse HCL payload",
-			)
-		},
-	)
-
-	t.Run(
-		"when succeeding to parse 'hclBytes' which has `vault_encrypted_secret`, "+
-			"but `vault_encrypted_secret` has non-string 'path' value, "+
-			"it returns error",
-		func(t *testing.T) {
-			// NOTE: Memory references are *intentionally* asserted for equality.
-			// It's very well known which objects are supposed to be changed.
-
-			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, err)
-
-			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	path = 1
-	encrypted_passphrase = "a1b2c3d4"
-	encrypted_data_json = "a1b2c3d4"
-}`)
-			hclParserArg := hcl.NewHclService()
-
-			b64Svc := base64.NewBase64Service()
-			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-
-			legacyEncryptedContentSvcArg := content.NewLegacyEncryptedContentService(
-				b64Svc,
-				aesSvc,
-			)
-
-			osExecutor := ostest.NewFakeOsExecutor(t)
-
-			encryptedPassphraseSvcArg := passphrase.NewEncryptedPassphraseService(
-				b64Svc,
-				rsa.NewRsaService(osExecutor),
-			)
-			encryptedPayloadSvcArg := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encryptedPassphraseSvcArg,
-				content.NewLegacyEncryptedContentService(b64Svc, aesSvc),
-			)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			actualReturn, actualErr := tfEncMigrationSvc.MigrateEncryptedTerraformResourceHcl(
-				hclParserArg,
-				hclBytesArg,
-				privKey,
-				&privKey.PublicKey,
-				legacyEncryptedContentSvcArg,
-				encryptedPassphraseSvcArg,
-				encryptedPayloadSvcArg,
-			)
-			require.Nil(t, actualReturn)
-
-			assert.Contains(
-				t,
-				actualErr.Error(),
-				"failed to get `path` string value for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+				"failed to parse HCL",
 			)
 		},
 	)
@@ -1164,11 +637,11 @@ resource "vault_encrypted_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = 1234
-	encrypted_data_json = "a1b2c3d4"
-}`)
+	resource "vault_encrypted_secret" "mysecret" {
+		path = "secret/example"
+		encrypted_passphrase = 1234
+		encrypted_data_json = "a1b2c3d4"
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -1208,8 +681,8 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to get `encrypted_passphrase` string value for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+				"failed to read `encrypted_passphrase` attr value for "+
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1226,11 +699,11 @@ resource "vault_encrypted_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = "a1b2c3d4"
-	encrypted_data_json = 1234
-}`)
+	resource "vault_encrypted_secret" "mysecret" {
+		path = "secret/example"
+		encrypted_passphrase = "a1b2c3d4"
+		encrypted_data_json = 1234
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -1270,69 +743,8 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to get `encrypted_data_json` string value for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
-			)
-		},
-	)
-
-	t.Run(
-		"when succeeding to parse 'hclBytes' which has `vault_encrypted_secret`, "+
-			"but `vault_encrypted_secret` has empty 'path' string value, "+
-			"it returns error",
-		func(t *testing.T) {
-			// NOTE: Memory references are *intentionally* asserted for equality.
-			// It's very well known which objects are supposed to be changed.
-
-			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, err)
-
-			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	path = ""
-	encrypted_passphrase = "a1b2c3d4"
-	encrypted_data_json = "a1b2c3d4"
-}`)
-			hclParserArg := hcl.NewHclService()
-
-			b64Svc := base64.NewBase64Service()
-			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-
-			legacyEncryptedContentSvcArg := content.NewLegacyEncryptedContentService(
-				b64Svc,
-				aesSvc,
-			)
-
-			osExecutor := ostest.NewFakeOsExecutor(t)
-
-			encryptedPassphraseSvcArg := passphrase.NewEncryptedPassphraseService(
-				b64Svc,
-				rsa.NewRsaService(osExecutor),
-			)
-			encryptedPayloadSvcArg := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encryptedPassphraseSvcArg,
-				content.NewLegacyEncryptedContentService(b64Svc, aesSvc),
-			)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			actualReturn, actualErr := tfEncMigrationSvc.MigrateEncryptedTerraformResourceHcl(
-				hclParserArg,
-				hclBytesArg,
-				privKey,
-				&privKey.PublicKey,
-				legacyEncryptedContentSvcArg,
-				encryptedPassphraseSvcArg,
-				encryptedPayloadSvcArg,
-			)
-			require.Nil(t, actualReturn)
-
-			assert.Contains(
-				t,
-				actualErr.Error(),
-				"empty `path` string value for `vault_encrypted_secret` `\"mysecret\"`",
+				"failed to read `encrypted_data_json` attr value for "+
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1349,11 +761,11 @@ resource "vault_encrypted_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = "a1b2c3d4"
-	encrypted_data_json = ""
-}`)
+	resource "vault_encrypted_secret" "mysecret" {
+		path = "secret/example"
+		encrypted_passphrase = "a1b2c3d4"
+		encrypted_data_json = ""
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -1393,8 +805,8 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"empty `encrypted_data_json` string value for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+				"empty `encrypted_data_json` attr value for "+
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1411,11 +823,11 @@ resource "vault_encrypted_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = ""
-	encrypted_data_json = "a1b2c3d4"
-}`)
+	resource "vault_encrypted_secret" "mysecret" {
+		path = "secret/example"
+		encrypted_passphrase = ""
+		encrypted_data_json = "a1b2c3d4"
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -1455,8 +867,8 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"empty `encrypted_passphrase` string value for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+				"empty `encrypted_passphrase` attr value for "+
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1467,18 +879,15 @@ resource "vault_encrypted_secret" "mysecret" {
 			"'encrypted_passphrase' string value, "+
 			"it returns error",
 		func(t *testing.T) {
-			// NOTE: Memory references are *intentionally* asserted for equality.
-			// It's very well known which objects are supposed to be changed.
-
 			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = "WvLTlMrX9NpYDQ\n\n\nlEIFlnDB=="
-	encrypted_data_json = "a1b2c3d4"
-}`)
+	resource "vault_encrypted_secret" "mysecret" {
+		path = "secret/example"
+		encrypted_passphrase = "WvLTlMrX9NpYDQ\n\n\nlEIFlnDB=="
+		encrypted_data_json = "a1b2c3d4"
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -1519,8 +928,8 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to deserialize `encrypted_passphrase` for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+				"failed to deserialize `encrypted_passphrase` attr value for "+
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1538,11 +947,11 @@ resource "vault_encrypted_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = "dGVzdAo="
-	encrypted_data_json = "dGVzdAo="
-}`)
+	resource "vault_encrypted_secret" "mysecret" {
+		path = "secret/example"
+		encrypted_passphrase = "dGVzdAo="
+		encrypted_data_json = "dGVzdAo="
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -1583,8 +992,8 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to decrypt `encrypted_passphrase` for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+				"failed to decrypt `encrypted_passphrase` attr value for "+
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1618,10 +1027,10 @@ resource "vault_encrypted_secret" "mysecret" {
 			hclBytesArg := []byte(
 				fmt.Sprintf(
 					`resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = "%s"
-	encrypted_data_json = "dGV\nz\ndAo="
-}`,
+		path = "secret/example"
+		encrypted_passphrase = "%s"
+		encrypted_data_json = "dGV\nz\ndAo="
+	}`,
 					serializedEncPassphrase,
 				),
 			)
@@ -1657,8 +1066,8 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to deserialize `encrypted_data_json` for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+				"failed to deserialize `encrypted_data_json` attr value for "+
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1692,10 +1101,10 @@ resource "vault_encrypted_secret" "mysecret" {
 			hclBytesArg := []byte(
 				fmt.Sprintf(
 					`resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = "%s"
-	encrypted_data_json = "dGVzdAo="
-}`,
+		path = "secret/example"
+		encrypted_passphrase = "%s"
+		encrypted_data_json = "dGVzdAo="
+	}`,
 					serializedEncPassphrase,
 				),
 			)
@@ -1731,8 +1140,8 @@ resource "vault_encrypted_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to decrypt `encrypted_data_json` for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+				"failed to decrypt `encrypted_data_json` attr value for "+
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1779,10 +1188,10 @@ resource "vault_encrypted_secret" "mysecret" {
 			hclBytesArg := []byte(
 				fmt.Sprintf(
 					`resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = "%s"
-	encrypted_data_json = "%s"
-}`,
+		path = "secret/example"
+		encrypted_passphrase = "%s"
+		encrypted_data_json = "%s"
+	}`,
 					serializedEncPassphrase,
 					serializedEncContent,
 				),
@@ -1840,7 +1249,7 @@ resource "vault_encrypted_secret" "mysecret" {
 				t,
 				actualErr.Error(),
 				"failed to generate new encrypted passphrase for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1887,10 +1296,10 @@ resource "vault_encrypted_secret" "mysecret" {
 			hclBytesArg := []byte(
 				fmt.Sprintf(
 					`resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = "%s"
-	encrypted_data_json = "%s"
-}`,
+		path = "secret/example"
+		encrypted_passphrase = "%s"
+		encrypted_data_json = "%s"
+	}`,
 					serializedEncPassphrase,
 					serializedEncContent,
 				),
@@ -1934,7 +1343,7 @@ resource "vault_encrypted_secret" "mysecret" {
 				t,
 				actualErr.Error(),
 				"failed to encrypt new encrypted payload for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -1981,10 +1390,10 @@ resource "vault_encrypted_secret" "mysecret" {
 			hclBytesArg := []byte(
 				fmt.Sprintf(
 					`resource "vault_encrypted_secret" "mysecret" {
-	path = "secret/example"
-	encrypted_passphrase = "%s"
-	encrypted_data_json = "%s"
-}`,
+		path = "secret/example"
+		encrypted_passphrase = "%s"
+		encrypted_data_json = "%s"
+	}`,
 					serializedEncPassphrase,
 					serializedEncContent,
 				),
@@ -2050,7 +1459,7 @@ resource "vault_encrypted_secret" "mysecret" {
 				t,
 				actualErr.Error(),
 				"failed to serialize new encrypted payload for "+
-					"`vault_encrypted_secret` `\"mysecret\"`",
+					"`vault_encrypted_secret.mysecret`",
 			)
 		},
 	)
@@ -2111,14 +1520,14 @@ resource "vault_encrypted_secret" "mysecret" {
 			hclSvcArg := hcl.NewHclService()
 			hclBytesArg := fmt.Sprintf(
 				`resource "vault_encrypted_secret" "my_secret_a" {
-   "path" = "secret/my_app/a"
-   "encrypted_passphrase" = "%s"
-   "encrypted_data_json" = "%s"
+  path = "secret/my_app/a"
+  encrypted_passphrase = "%s"
+  encrypted_data_json = "%s"
 }
 resource "vault_encrypted_secret" "my_secret_b" {
-   "path" = "secret/my_app/b"
-   "encrypted_passphrase" = "%s"
-   "encrypted_data_json" = "%s"
+  path = "secret/my_app/b"
+  encrypted_passphrase = "%s"
+  encrypted_data_json = "%s"
 }`,
 				serializedEncPassphraseA,
 				serializedEncContentA,
@@ -2149,60 +1558,24 @@ resource "vault_encrypted_secret" "my_secret_b" {
 
 			require.Nil(t, actualErr)
 
-			objectItems, ok := actualReturn.Node.(*ast.ObjectList)
-			require.True(t, ok)
+			expectedRegex := regexp.MustCompile(`resource "vaulted_vault_secret" "my_secret_a" {
+  path(?:\s+)= "secret/my_app/a"
+  encrypted_payload(?:\s+)= "(.+)"
+}
+resource "vaulted_vault_secret" "my_secret_b" {
+  path(?:\s+)= "secret/my_app/b"
+  encrypted_payload(?:\s+)= "(.+)"
+}`)
 
-			assert.Equal(t, 2, len(objectItems.Items))
+			actualReturnString := string(actualReturn.Bytes())
+			regexMatches := expectedRegex.FindAllStringSubmatch(actualReturnString, -1)
+			require.Equal(t, 1, len(regexMatches))
+			require.Equal(t, 3, len(regexMatches[0]))
 
-			itemA := objectItems.Items[0]
-			assert.Equal(t, 3, len(itemA.Keys))
-			assert.Equal(t, "vaulted_vault_secret", itemA.Keys[1].Token.Value())
-
-			itemAobj, ok := itemA.Val.(*ast.ObjectType)
-			require.True(t, ok)
-
-			assert.Equal(t, 2, len(itemAobj.List.Items))
-
-			assert.Equal(t, 1, len(itemAobj.List.Items[0].Keys))
-			assert.Equal(t, "path", itemAobj.List.Items[0].Keys[0].Token.Value())
-			assert.Equal(t, hclEqualSign, itemAobj.List.Items[0].Assign)
-
-			itemApathVal, ok := itemAobj.List.Items[0].Val.(*ast.LiteralType)
-			require.True(t, ok)
-			assert.Equal(t, "secret/my_app/a", itemApathVal.Token.Value())
-
-			assert.Equal(t, 1, len(itemAobj.List.Items[1].Keys))
-			assert.Equal(t, "payload_json", itemAobj.List.Items[1].Keys[0].Token.Value())
-			assert.Equal(t, hclEqualSign, itemAobj.List.Items[1].Assign)
-
-			itemApayloadJsonVal, ok := itemAobj.List.Items[1].Val.(*ast.LiteralType)
-			require.True(t, ok)
-			assert.NotEqual(t, serializedEncContentA, itemApayloadJsonVal)
-			assert.NotEqual(t, contentA, itemApayloadJsonVal)
-
-			itemB := objectItems.Items[0]
-			assert.Equal(t, 3, len(itemB.Keys))
-			assert.Equal(t, "vaulted_vault_secret", itemB.Keys[1].Token.Value())
-
-			itemBobj, ok := itemB.Val.(*ast.ObjectType)
-			require.True(t, ok)
-
-			assert.Equal(t, 2, len(itemBobj.List.Items))
-
-			assert.Equal(t, 1, len(itemBobj.List.Items[0].Keys))
-			assert.Equal(t, "path", itemBobj.List.Items[0].Keys[0].Token.Value())
-
-			itemBpathVal, ok := itemBobj.List.Items[0].Val.(*ast.LiteralType)
-			require.True(t, ok)
-			assert.Equal(t, "secret/my_app/a", itemBpathVal.Token.Value())
-
-			assert.Equal(t, 1, len(itemBobj.List.Items[1].Keys))
-			assert.Equal(t, "payload_json", itemBobj.List.Items[1].Keys[0].Token.Value())
-
-			itemBpayloadJsonVal, ok := itemBobj.List.Items[1].Val.(*ast.LiteralType)
-			require.True(t, ok)
-			assert.NotEqual(t, serializedEncContentB, itemBpayloadJsonVal)
-			assert.NotEqual(t, contentB, itemBpayloadJsonVal)
+			match := testutils.VaultedPayloadRegex.FindAllStringSubmatch(regexMatches[0][1], -1)
+			assert.Equal(t, 1, len(match))
+			match = testutils.VaultedPayloadRegex.FindAllStringSubmatch(regexMatches[0][2], -1)
+			assert.Equal(t, 1, len(match))
 		},
 	)
 }
@@ -2244,58 +1617,11 @@ func TestService_RotateOrRekeyEncryptedTerraformResourceHcl(t *testing.T) {
 			)
 			require.Nil(t, actualReturn)
 
-			assert.Contains(t, actualErr.Error(), "failed to parse HCL payload")
-		},
-	)
-
-	t.Run(
-		"when succeeding to parse 'hclBytes', "+
-			"but HCL parsed file does not contain a list of HCL objects, "+
-			"it returns an error",
-		func(t *testing.T) {
-			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, err)
-
-			hclBytesArg := []byte("{ invalid }")
-
-			hclParserArg := &test.MockHclParser{}
-
-			// NOTE: Simulating wrong behavior of HCL parser is tricky,
-			// instead mock the HCL parser to return a specific AST.
-			fakeHclAst := &ast.File{
-				Node: &ast.ObjectItem{},
-			}
-			hclParserArg.On("Parse", hclBytesArg).Return(fakeHclAst, nil)
-
-			b64Svc := base64.NewBase64Service()
-			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-
-			osExecutor := ostest.NewFakeOsExecutor(t)
-
-			encryptedPassphraseSvcArg := passphrase.NewEncryptedPassphraseService(
-				b64Svc,
-				rsa.NewRsaService(osExecutor),
+			assert.Contains(
+				t,
+				actualErr.Error(),
+				"Failed to parse HCL, encountered: 1 errs.",
 			)
-			encryptedPayloadSvcArg := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encryptedPassphraseSvcArg,
-				content.NewLegacyEncryptedContentService(b64Svc, aesSvc),
-			)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			actualReturn, actualErr := tfEncMigrationSvc.RotateOrRekeyEncryptedTerraformResourceHcl(
-				hclParserArg,
-				hclBytesArg,
-				privKey,
-				&privKey.PublicKey,
-				encryptedPassphraseSvcArg,
-				encryptedPayloadSvcArg,
-			)
-			require.Nil(t, actualReturn)
-
-			assert.Contains(t, actualErr.Error(), "HCL file does not have a list of resources")
 		},
 	)
 
@@ -2349,33 +1675,7 @@ resource "vault_generic_secret" "mysecret" {
 			)
 			require.Nil(t, actualErr)
 
-			assert.Equal(t, expectedReturn, actualReturn)
-
-			expectedReturnObjList, ok := expectedReturn.Node.(*ast.ObjectList)
-			require.True(t, ok)
-
-			actualReturnObjList, ok := actualReturn.Node.(*ast.ObjectList)
-			require.True(t, ok)
-
-			assert.Equal(t, expectedReturnObjList, actualReturnObjList)
-
-			assert.Equal(t, 1, len(actualReturnObjList.Items))
-
-			expectedReturnObjListItem := expectedReturnObjList.Items[0]
-			actualReturnObjListItem := actualReturnObjList.Items[0]
-
-			assert.Equal(t, expectedReturnObjListItem, actualReturnObjListItem)
-
-			expectedReturnItemValObject, ok := expectedReturnObjListItem.Val.(*ast.ObjectType)
-			require.True(t, ok)
-
-			actualReturnItemValObject, ok := actualReturnObjListItem.Val.(*ast.ObjectType)
-			require.True(t, ok)
-
-			assert.Equal(t, expectedReturnItemValObject, actualReturnItemValObject)
-
-			assert.Equal(t, expectedReturnItemValObject.List, actualReturnItemValObject.List)
-			assert.Equal(t, expectedReturnItemValObject.List.Items, actualReturnItemValObject.List.Items)
+			assert.Equal(t, expectedReturn.Bytes(), actualReturn.Bytes())
 		},
 	)
 
@@ -2421,14 +1721,14 @@ resource "vault_generic_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to parse HCL payload",
+				"Failed to parse HCL, encountered: 1 errs.",
 			)
 		},
 	)
 
 	t.Run(
 		"when succeeding to parse 'hclBytes' which has `vaulted_vault_secret`, "+
-			"but `vaulted_vault_secret` has less than 2 content keys, "+
+			"but `vaulted_vault_secret` has no `payload_json`, "+
 			"it returns error",
 		func(t *testing.T) {
 			// NOTE: Memory references are *intentionally* asserted for equality.
@@ -2438,9 +1738,9 @@ resource "vault_generic_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vaulted_vault_secret" "mysecret" {
-	path = "secret/example"
-}`)
+	resource "vaulted_vault_secret" "mysecret" {
+		path = "secret/example"
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -2474,117 +1774,7 @@ resource "vaulted_vault_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"HCL resource `vaulted_vault_secret` `\"mysecret\"` content is "+
-					"likely malformed. Expected exactly 2 key-value pairs",
-			)
-		},
-	)
-
-	t.Run(
-		"when succeeding to parse 'hclBytes' which has `vaulted_vault_secret`, "+
-			"but `vaulted_vault_secret` has non-string key, "+
-			"it returns error",
-		func(t *testing.T) {
-			// NOTE: Memory references are *intentionally* asserted for equality.
-			// It's very well known which objects are supposed to be changed.
-
-			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, err)
-
-			hclBytesArg := []byte(`
-resource "vaulted_vault_secret" "mysecret" {
-	1 = "1234"
-	payload_json = "a1b2c3d4"
-}`)
-			hclParserArg := hcl.NewHclService()
-
-			b64Svc := base64.NewBase64Service()
-			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-
-			osExecutor := ostest.NewFakeOsExecutor(t)
-
-			encryptedPassphraseSvcArg := passphrase.NewEncryptedPassphraseService(
-				b64Svc,
-				rsa.NewRsaService(osExecutor),
-			)
-			encryptedPayloadSvcArg := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encryptedPassphraseSvcArg,
-				content.NewLegacyEncryptedContentService(b64Svc, aesSvc),
-			)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			actualReturn, actualErr := tfEncMigrationSvc.RotateOrRekeyEncryptedTerraformResourceHcl(
-				hclParserArg,
-				hclBytesArg,
-				privKey,
-				&privKey.PublicKey,
-				encryptedPassphraseSvcArg,
-				encryptedPayloadSvcArg,
-			)
-			require.Nil(t, actualReturn)
-
-			assert.Contains(
-				t,
-				actualErr.Error(),
-				"failed to parse HCL payload",
-			)
-		},
-	)
-
-	t.Run(
-		"when succeeding to parse 'hclBytes' which has `vaulted_vault_secret`, "+
-			"but `vaulted_vault_secret` has non-string 'path' value, "+
-			"it returns error",
-		func(t *testing.T) {
-			// NOTE: Memory references are *intentionally* asserted for equality.
-			// It's very well known which objects are supposed to be changed.
-
-			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, err)
-
-			hclBytesArg := []byte(`
-resource "vaulted_vault_secret" "mysecret" {
-	path = 1
-	payload_json = "a1b2c3d4"
-}`)
-			hclParserArg := hcl.NewHclService()
-
-			b64Svc := base64.NewBase64Service()
-			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-
-			osExecutor := ostest.NewFakeOsExecutor(t)
-
-			encryptedPassphraseSvcArg := passphrase.NewEncryptedPassphraseService(
-				b64Svc,
-				rsa.NewRsaService(osExecutor),
-			)
-			encryptedPayloadSvcArg := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encryptedPassphraseSvcArg,
-				content.NewLegacyEncryptedContentService(b64Svc, aesSvc),
-			)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			actualReturn, actualErr := tfEncMigrationSvc.RotateOrRekeyEncryptedTerraformResourceHcl(
-				hclParserArg,
-				hclBytesArg,
-				privKey,
-				&privKey.PublicKey,
-				encryptedPassphraseSvcArg,
-				encryptedPayloadSvcArg,
-			)
-			require.Nil(t, actualReturn)
-
-			assert.Contains(
-				t,
-				actualErr.Error(),
-				"failed to get `path` string value for "+
-					"`vaulted_vault_secret` `\"mysecret\"`",
+				"failed to read `payload_json` attr value for `vaulted_vault_secret.mysecret`",
 			)
 		},
 	)
@@ -2601,10 +1791,10 @@ resource "vaulted_vault_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vaulted_vault_secret" "mysecret" {
-	path = "secret/example"
-	payload_json = 1234
-}`)
+	resource "vaulted_vault_secret" "mysecret" {
+		path = "secret/example"
+		payload_json = 1234
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -2638,62 +1828,7 @@ resource "vaulted_vault_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to get `payload_json` string value for "+
-					"`vaulted_vault_secret` `\"mysecret\"`",
-			)
-		},
-	)
-
-	t.Run(
-		"when succeeding to parse 'hclBytes' which has `vaulted_vault_secret`, "+
-			"but `vaulted_vault_secret` has empty 'path' string value, "+
-			"it returns error",
-		func(t *testing.T) {
-			// NOTE: Memory references are *intentionally* asserted for equality.
-			// It's very well known which objects are supposed to be changed.
-
-			privKey, err := stdRsa.GenerateKey(rand.Reader, 2048)
-			require.Nil(t, err)
-
-			hclBytesArg := []byte(`
-resource "vaulted_vault_secret" "mysecret" {
-	path = ""
-	payload_json = "a1b2c3d4"
-}`)
-			hclParserArg := hcl.NewHclService()
-
-			b64Svc := base64.NewBase64Service()
-			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-
-			osExecutor := ostest.NewFakeOsExecutor(t)
-
-			encryptedPassphraseSvcArg := passphrase.NewEncryptedPassphraseService(
-				b64Svc,
-				rsa.NewRsaService(osExecutor),
-			)
-			encryptedPayloadSvcArg := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encryptedPassphraseSvcArg,
-				content.NewLegacyEncryptedContentService(b64Svc, aesSvc),
-			)
-
-			tfSvc := terraform.NewTerraformService()
-			tfEncMigrationSvc := NewTerraformEncryptionMigrationService(tfSvc)
-
-			actualReturn, actualErr := tfEncMigrationSvc.RotateOrRekeyEncryptedTerraformResourceHcl(
-				hclParserArg,
-				hclBytesArg,
-				privKey,
-				&privKey.PublicKey,
-				encryptedPassphraseSvcArg,
-				encryptedPayloadSvcArg,
-			)
-			require.Nil(t, actualReturn)
-
-			assert.Contains(
-				t,
-				actualErr.Error(),
-				"empty `path` string value for `vaulted_vault_secret` `\"mysecret\"`",
+				"failed to read `payload_json` attr value for `vaulted_vault_secret.mysecret`",
 			)
 		},
 	)
@@ -2710,10 +1845,10 @@ resource "vaulted_vault_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vaulted_vault_secret" "mysecret" {
-	path = "secret/example"
-	payload_json = ""
-}`)
+	resource "vaulted_vault_secret" "mysecret" {
+		path = "secret/example"
+		payload_json = ""
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -2747,8 +1882,7 @@ resource "vaulted_vault_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"empty `payload_json` string value for "+
-					"`vaulted_vault_secret` `\"mysecret\"`",
+				"empty `payload_json` attr value for `vaulted_vault_secret.mysecret`",
 			)
 		},
 	)
@@ -2765,10 +1899,10 @@ resource "vaulted_vault_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vaulted_vault_secret" "mysecret" {
-	path = "secret/example"
-	payload_json = "WvLTlMrX9NpYDQ\n\n\nlEIFlnDB=="
-}`)
+	resource "vaulted_vault_secret" "mysecret" {
+		path = "secret/example"
+		payload_json = "WvLTlMrX9NpYDQ\n\n\nlEIFlnDB=="
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -2803,8 +1937,7 @@ resource "vaulted_vault_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to deserialize `payload_json` for "+
-					"`vaulted_vault_secret` `\"mysecret\"`",
+				"failed to deserialize `payload_json` attr's value for `vaulted_vault_secret.mysecret`",
 			)
 		},
 	)
@@ -2822,10 +1955,10 @@ resource "vaulted_vault_secret" "mysecret" {
 			require.Nil(t, err)
 
 			hclBytesArg := []byte(`
-resource "vaulted_vault_secret" "mysecret" {
-	path = "secret/example"
-	payload_json = "$VED;1.0::bkWby39RtkomRc8TI4zOqI4qLAOVP2nWxPIyZ990yQoOzb2RRGZ3EqNoopm7anJgGLTDY4UxeSDOVfe2IhI8JYr8MwGkCru3Al6GUsaLBuv7hv/C7NbmoYmff9nPOipFKmOXRPdwC4PeTW29jjDXSfCWwSdvWMXsyqfNXKwBc2ZA+aOqD2hESb7WITSeBsjOizpfBbOuNLhTTdRhVCbIHKRjcz6sWxMsyE7/yjjUPtkf+zs6WixoBPh52bukmPWESaAe1bv9IV/PUBGQTMvTzzdsMG7JTBnH/IZRnUYo6SAsg8hnQAQZmARK6oIZ0Lcj38p+hpAbJG2bSFGFDJmJUdQqnygOGUcOp05ZElFwjHkE1JbRQ/KQV8Izrmy47et+OOUlv0K2KnJ+Yk9HBHRVkk+DuvaTLHjF+rIB/CpEfipjGjkoFvmS4HYUxNhx+KYGW7eZqevClPtWjQMMlpWzDJQwnYyDrwPUwhuHv5/G/CLKrNJ9JEnAcGTxss3oJCwj9jUtbwzit+6aC0PfskXYuujxomMnD3BD78NupmEF40Cf0kefdKyfhzHzXhv5qfdUAJ6F4cpwRPOR5U0zIpFPLq1xKM66Ju5mG4omKGe1yHwKJz6/APTA4OXbVjVPDPhnz5EGiYq1fK+Jatpz3AHbjJaC7fo137iUbZDfCF10LDQ=::u5LPpDE9BfeIvskvgR2PFfK6MDRZTb58h2lDO3dtTaU="
-}`)
+	resource "vaulted_vault_secret" "mysecret" {
+		path = "secret/example"
+		payload_json = "$VED;1.0::bkWby39RtkomRc8TI4zOqI4qLAOVP2nWxPIyZ990yQoOzb2RRGZ3EqNoopm7anJgGLTDY4UxeSDOVfe2IhI8JYr8MwGkCru3Al6GUsaLBuv7hv/C7NbmoYmff9nPOipFKmOXRPdwC4PeTW29jjDXSfCWwSdvWMXsyqfNXKwBc2ZA+aOqD2hESb7WITSeBsjOizpfBbOuNLhTTdRhVCbIHKRjcz6sWxMsyE7/yjjUPtkf+zs6WixoBPh52bukmPWESaAe1bv9IV/PUBGQTMvTzzdsMG7JTBnH/IZRnUYo6SAsg8hnQAQZmARK6oIZ0Lcj38p+hpAbJG2bSFGFDJmJUdQqnygOGUcOp05ZElFwjHkE1JbRQ/KQV8Izrmy47et+OOUlv0K2KnJ+Yk9HBHRVkk+DuvaTLHjF+rIB/CpEfipjGjkoFvmS4HYUxNhx+KYGW7eZqevClPtWjQMMlpWzDJQwnYyDrwPUwhuHv5/G/CLKrNJ9JEnAcGTxss3oJCwj9jUtbwzit+6aC0PfskXYuujxomMnD3BD78NupmEF40Cf0kefdKyfhzHzXhv5qfdUAJ6F4cpwRPOR5U0zIpFPLq1xKM66Ju5mG4omKGe1yHwKJz6/APTA4OXbVjVPDPhnz5EGiYq1fK+Jatpz3AHbjJaC7fo137iUbZDfCF10LDQ=::u5LPpDE9BfeIvskvgR2PFfK6MDRZTb58h2lDO3dtTaU="
+	}`)
 			hclParserArg := hcl.NewHclService()
 
 			b64Svc := base64.NewBase64Service()
@@ -2860,8 +1993,7 @@ resource "vaulted_vault_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to decrypt `payload_json` for "+
-					"`vaulted_vault_secret` `\"mysecret\"`",
+				"failed to decrypt `payload_json` attr's value for `vaulted_vault_secret.mysecret`",
 			)
 		},
 	)
@@ -2907,9 +2039,9 @@ resource "vaulted_vault_secret" "mysecret" {
 			hclBytesArg := []byte(
 				fmt.Sprintf(
 					`resource "vaulted_vault_secret" "mysecret" {
-	path = "secret/example"
-	payload_json = "%s"
-}`,
+		path = "secret/example"
+		payload_json = "%s"
+	}`,
 					serializedEncPayload,
 				),
 			)
@@ -2941,8 +2073,7 @@ resource "vaulted_vault_secret" "mysecret" {
 			assert.Contains(
 				t,
 				actualErr.Error(),
-				"failed to generate new passphrase for "+
-					"`vaulted_vault_secret` `\"mysecret\"`",
+				"failed to generate new passphrase for `vaulted_vault_secret.mysecret`",
 			)
 		},
 	)
@@ -2990,8 +2121,8 @@ resource "vaulted_vault_secret" "mysecret" {
 			hclSvcArg := hcl.NewHclService()
 			hclBytesArg := fmt.Sprintf(
 				`resource "vaulted_vault_secret" "my_secret_b" {
-   "path" = "secret/my_app/b"
-   "payload_json" = "%s"
+  path         = "secret/my_app/b"
+  payload_json = "%s"
 }`,
 				serializedPayloadJSON,
 			)
@@ -3010,35 +2141,21 @@ resource "vaulted_vault_secret" "mysecret" {
 
 			require.Nil(t, actualErr)
 
-			objectItems, ok := actualReturn.Node.(*ast.ObjectList)
-			require.True(t, ok)
+			actualReturnString := string(actualReturn.Bytes())
+			expectedRegex := regexp.MustCompile(
+				`resource "vaulted_vault_secret" "my_secret_b" {
+  path         = "secret/my_app/b"
+  payload_json = "(.+)"
+}`,
+			)
+			regexMatches := expectedRegex.FindAllStringSubmatch(actualReturnString, -1)
+			require.Equal(t, 1, len(regexMatches))
+			require.Equal(t, 2, len(regexMatches[0]))
 
-			assert.Equal(t, 1, len(objectItems.Items))
-
-			assert.Equal(t, 3, len(objectItems.Items[0].Keys))
-			assert.Equal(t, "vaulted_vault_secret", objectItems.Items[0].Keys[1].Token.Value())
-
-			itemObj, ok := objectItems.Items[0].Val.(*ast.ObjectType)
-			require.True(t, ok)
-
-			assert.Equal(t, 2, len(itemObj.List.Items))
-
-			assert.Equal(t, 1, len(itemObj.List.Items[0].Keys))
-			assert.Equal(t, "path", itemObj.List.Items[0].Keys[0].Token.Value())
-			assert.Equal(t, hclEqualSign, itemObj.List.Items[0].Assign)
-
-			itemPathVal, ok := itemObj.List.Items[0].Val.(*ast.LiteralType)
-			require.True(t, ok)
-			assert.Equal(t, "secret/my_app/b", itemPathVal.Token.Value())
-
-			assert.Equal(t, 1, len(itemObj.List.Items[1].Keys))
-			assert.Equal(t, "payload_json", itemObj.List.Items[1].Keys[0].Token.Value())
-			assert.Equal(t, hclEqualSign, itemObj.List.Items[1].Assign)
-
-			itemPayloadJsonVal, ok := itemObj.List.Items[1].Val.(*ast.LiteralType)
-			require.True(t, ok)
-			assert.NotEqual(t, serializedPayloadJSON, itemPayloadJsonVal)
-			assert.NotEqual(t, payload.Content.Plaintext, itemPayloadJsonVal)
+			match := testutils.VaultedPayloadRegex.FindAllStringSubmatch(regexMatches[0][1], -1)
+			assert.Equal(t, 1, len(match))
+			// NOTE: Make sure the value was changed
+			assert.NotEqual(t, match[0], serializedPayloadJSON)
 		},
 	)
 }
