@@ -4,10 +4,6 @@ All subcommands are:
 
 * [`vaulted version`](#vaulted-version)
 * [`vaulted help`](#vaulted-help)
-* [`vaulted legacy`](#vaulted-legacy)
-* [`vaulted legacy ini`](#vaulted-legacy-ini)
-* [`vaulted legacy encrypt`](#vaulted-legacy-encrypt)
-* [`vaulted legacy decrypt`](#vaulted-legacy-decrypt)
 * [`vaulted encrypt`](#vaulted-encrypt)
 * [`vaulted decrypt`](#vaulted-decrypt)
 * [`vaulted rotate`](#vaulted-rotate)
@@ -43,7 +39,6 @@ Available Commands:
   decrypt     Decrypt a file/value
   encrypt     Encrypt a file/value
   help        Help about any command
-  legacy      Legacy Proof-of-concept-phase commands
   rekey       Rekey (decrypt and encrypt using different keypair) a file/value
   rotate      Rotate (decrypt and encrypt) a file/value
   terraform   Terraform resources related commands
@@ -53,54 +48,6 @@ Flags:
   -h, --help   help for vaulted
 
 Use "vaulted [command] --help" for more information about a command.
-```
-
-## `vaulted legacy`
-
-Points you to using `--help` to see available subcommands for `legacy`.
-
-```shell
-> vaulted legacy
-Use `--help` to see available commands
-```
-
-## `vaulted legacy ini`
-
-Converts an INI file to terraform file. It uses "legacy" `vault_encrypted_secret` terraform resources.
-
-```shell
-> vaulted legacy ini \
---public-key-path pubkey.pem \
---in ./my_secrets.ini \
---out ./my_secrets.tf
-```
-
-## `vaulted legacy encrypt`
-
-Encrypts an `in` file source or from stdin and 
-writes to `out` file source or to stdout.
-
-It uses legacy encryption strategy.
-
-```shell
-> vaulted legacy encrypt \
---public-key-path pubkey.pem \
---in ./my_secrets.raw \
---out ./my_secrets.enc
-```
-
-## `vaulted legacy decrypt`
-
-Decrypts an `in` file source or from stdin and 
-writes to `out` file source or to stdout.
-
-It uses legacy decryption strategy.
-
-```shell
-> vaulted legacy decrypt \
---private-key-path privkey.pem \
---in ./my_secrets.enc \
---out ./my_secrets.raw
 ```
 
 ## `vaulted encrypt`

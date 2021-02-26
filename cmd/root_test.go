@@ -76,7 +76,6 @@ Available Commands:
   decrypt     Decrypt a file/value
   encrypt     Encrypt a file/value
   help        Help about any command
-  legacy      Legacy Proof-of-concept-phase commands
   rekey       Rekey (decrypt and encrypt using different keypair) a file/value
   rotate      Rotate (decrypt and encrypt) a file/value
   terraform   Terraform resources related commands
