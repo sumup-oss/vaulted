@@ -77,7 +77,6 @@ func TestIniCmd_Execute(t *testing.T) {
 				encPassphraseSvc,
 				encPayloadSvc,
 				hclSvc,
-				tfSvc,
 				tfEncMigrationSvc,
 			)
 
@@ -146,7 +145,6 @@ myOtherKey=exampleother
 				encPassphraseSvc,
 				encPayloadSvc,
 				hclSvc,
-				tfSvc,
 				tfEncMigrationSvc,
 			)
 
@@ -172,7 +170,7 @@ myOtherKey=exampleother
 				string(outContent),
 				-1,
 			)
-			assert.Equal(t, 2, len(regexMatches))
+			require.Equal(t, 2, len(regexMatches))
 
 			assert.Equal(
 				t,

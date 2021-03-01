@@ -20,7 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/sumup-oss/go-pkgs/os/ostest"
-	theseusTestUtils "github.com/sumup-oss/go-pkgs/testutils"
+	gopkgsTestUtils "github.com/sumup-oss/go-pkgs/testutils"
 	"github.com/sumup-oss/vaulted/pkg/aes"
 	"github.com/sumup-oss/vaulted/pkg/base64"
 	"github.com/sumup-oss/vaulted/pkg/hcl"
@@ -62,7 +62,6 @@ func TestNewTerraformCmd(t *testing.T) {
 		legacyEncContentSvc,
 		encPayloadSvc,
 		hclSvc,
-		tfSvc,
 		tfEncMigrationSvc,
 	)
 
@@ -100,11 +99,10 @@ func TestTerraformCmd_Execute(t *testing.T) {
 		legacyEncContentSvc,
 		encPayloadSvc,
 		hclSvc,
-		tfSvc,
 		tfEncMigrationSvc,
 	)
 
-	_, err := theseusTestUtils.RunCommandInSameProcess(
+	_, err := gopkgsTestUtils.RunCommandInSameProcess(
 		cmdInstance,
 		[]string{},
 		outputBuff,
@@ -128,7 +126,7 @@ Flags:
 Use "terraform [command] --help" for more information about a command.
 `,
 		outputBuff.String(),
-)
+	)
 	assert.Nil(t, err)
 
 	osExecutor.AssertExpectations(t)

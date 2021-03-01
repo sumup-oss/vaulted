@@ -15,86 +15,35 @@
 package hcl
 
 import (
-	"bytes"
-	"errors"
 	"testing"
 
-	"github.com/hashicorp/hcl/hcl/ast"
-	"github.com/hashicorp/hcl/hcl/token"
+	"github.com/palantir/stacktrace"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-type fakeWriter struct {
-	mock.Mock
-}
-
-func (f *fakeWriter) Write(p []byte) (n int, err error) {
-	args := f.Called(p)
-	return args.Int(0), args.Error(1)
-}
-
 func TestHclService_Parse(t *testing.T) {
 	t.Run(
-		"with `src` that is not JSON or HCL, it returns an error",
+		"with `src` that is not HCL, it returns an error",
 		func(t *testing.T) {
 			t.Parallel()
 
 			svc := NewHclService()
-			srcArg := []byte("not json")
+			srcArg := []byte("not hcl")
 
 			actualReturn, actualErr := svc.Parse(srcArg)
 			require.Nil(t, actualReturn)
+			require.NotNil(t, actualErr)
 
+			require.IsType(t, stacktrace.RootCause(actualErr), &ParseErr{})
+			parseErr := stacktrace.RootCause(actualErr).(*ParseErr)
+
+			require.Equal(t, 1, len(parseErr.Errs))
 			assert.Contains(
 				t,
-				actualErr.Error(),
-				"key 'not json' expected start of object ('{') or assignment ('='",
+				parseErr.Errs[0].Error(),
+				"Either a quoted string block label or an opening brace (\"{\") is expected here.",
 			)
-		},
-	)
-
-	t.Run(
-		"with `src` that is invalid (not properly closed) JSON, it actually parses the JSON and returns AST",
-		func(t *testing.T) {
-			t.Parallel()
-
-			svc := NewHclService()
-			// NOTE: Invalid due to not closed object
-			srcArg := []byte(`{ "a": "b"`)
-
-			actualReturn, actualErr := svc.Parse(srcArg)
-			require.Nil(t, actualErr)
-
-			node := actualReturn.Node.(*ast.ObjectList)
-			assert.Equal(t, 1, len(node.Items))
-			object := node.Items[0]
-
-			assert.Equal(t, `"a"`, object.Keys[0].Token.Text)
-			objectValue := object.Val.(*ast.LiteralType)
-			assert.Equal(t, `"b"`, objectValue.Token.Text)
-		},
-	)
-
-	t.Run(
-		"with marshaled `src` that is valid (properly closed and no comments) JSON, it returns ast file",
-		func(t *testing.T) {
-			t.Parallel()
-
-			svc := NewHclService()
-			srcArg := []byte(`{ "a": "b" }`)
-
-			actualReturn, actualErr := svc.Parse(srcArg)
-			require.Nil(t, actualErr)
-
-			node := actualReturn.Node.(*ast.ObjectList)
-			assert.Equal(t, 1, len(node.Items))
-			object := node.Items[0]
-
-			assert.Equal(t, `"a"`, object.Keys[0].Token.Text)
-			objectValue := object.Val.(*ast.LiteralType)
-			assert.Equal(t, `"b"`, objectValue.Token.Text)
 		},
 	)
 
@@ -104,92 +53,20 @@ func TestHclService_Parse(t *testing.T) {
 			t.Parallel()
 
 			svc := NewHclService()
-			srcArg := []byte(`"a" = "b"`)
+			srcArg := []byte(`foo = "example"`)
 
 			actualReturn, actualErr := svc.Parse(srcArg)
 			require.Nil(t, actualErr)
 
-			node := actualReturn.Node.(*ast.ObjectList)
-			assert.Equal(t, 1, len(node.Items))
-			object := node.Items[0]
+			attrs := actualReturn.Body().Attributes()
+			require.Equal(t, 1, len(attrs))
+			require.NotNil(t, attrs["foo"])
+			attr := attrs["foo"]
 
-			assert.Equal(t, 1, len(object.Keys))
+			require.Equal(t, `foo = "example"`, string(attr.BuildTokens(nil).Bytes()))
 
-			assert.Equal(t, `"a"`, object.Keys[0].Token.Text)
-			objectValue := object.Val.(*ast.LiteralType)
-			assert.Equal(t, `"b"`, objectValue.Token.Text)
-		},
-	)
-}
-
-func TestHclService_Fprint(t *testing.T) {
-	t.Run(
-		"with non-writable `output` and non-nil `node`, it returns an error",
-		func(t *testing.T) {
-			wrArg := &fakeWriter{}
-			wrArg.Test(t)
-
-			fakeError := errors.New("fakeWriteError")
-
-			wrArg.On(
-				"Write",
-				mock.Anything,
-			).Return(
-				0,
-				fakeError,
-			)
-
-			svc := NewHclService()
-
-			nodeArg := &ast.ObjectKey{
-				Token: token.Token{
-					Type: token.STRING,
-					Text: `"foo"`,
-				},
-			}
-
-			actualErr := svc.Fprint(wrArg, nodeArg)
-
-			assert.Equal(t, fakeError, actualErr)
-			wrArg.AssertExpectations(t)
-		},
-	)
-
-	t.Run(
-		"with writable `output` and non-nil `node`, it writes the JSON representation of the AST in `output`",
-		func(t *testing.T) {
-			var wrArg bytes.Buffer
-
-			svc := NewHclService()
-
-			nodeArg := &ast.ObjectKey{
-				Token: token.Token{
-					Type: token.STRING,
-					Text: `"foo"`,
-				},
-			}
-
-			actualErr := svc.Fprint(&wrArg, nodeArg)
-			require.Nil(t, actualErr)
-
-			assert.Equal(t, `"foo"`, wrArg.String())
-		},
-	)
-
-	t.Run(
-		"with writable `output` and nil `node`, it doesn't write anything in `output`",
-		func(t *testing.T) {
-			var wrArg bytes.Buffer
-
-			svc := NewHclService()
-
-			beforeWriteLen := wrArg.Len()
-
-			actualErr := svc.Fprint(&wrArg, nil)
-			require.Nil(t, actualErr)
-
-			assert.Equal(t, beforeWriteLen, wrArg.Len())
-			assert.Equal(t, ``, wrArg.String())
+			blocks := actualReturn.Body().Blocks()
+			require.Equal(t, 0, len(blocks))
 		},
 	)
 }

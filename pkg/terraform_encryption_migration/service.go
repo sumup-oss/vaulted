@@ -18,32 +18,27 @@ import (
 	stdRsa "crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
-	"github.com/hashicorp/hcl/hcl/ast"
-	"github.com/hashicorp/hcl/hcl/token"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/palantir/stacktrace"
+	"github.com/zclconf/go-cty/cty"
 
 	"github.com/sumup-oss/vaulted/pkg/hcl"
 	"github.com/sumup-oss/vaulted/pkg/ini"
-	"github.com/sumup-oss/vaulted/pkg/terraform"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 const (
-	resourceTypeName                     = "resource"
-	pathKeyName                          = "path"
-	vaultEncryptedSecretResourceTypeName = "vault_encrypted_secret"
-	vaultedVaultResourceTypeName         = "vaulted_vault_secret"
+	resourceType                     = "resource"
+	vaultEncryptedSecretResourceType = "vault_encrypted_secret"
+	// nolint:gosec
+	vaultedVaultSecretResourceType = "vaulted_vault_secret"
 )
-
-// HACK: HCL printer prints an equal sign in a `key = value` expression
-// only when the line is positive. The line number does not matter.
-var hclEqualSign = token.Pos{
-	Line: 1,
-}
 
 type Service struct {
 	terraformSvc terraformService
@@ -67,7 +62,7 @@ func (s *Service) MigrateEncryptedTerraformResourceHcl(
 	legacyEncryptedContentSvc EncryptedContentService,
 	encryptedPassphraseSvc EncryptedPassphraseService,
 	encryptedPayloadSvc EncryptedPayloadService,
-) (*ast.File, error) {
+) (*hclwrite.File, error) {
 	return s.terraformSvc.ModifyInPlaceHclAst(
 		hclParser,
 		hclBytes,
@@ -92,7 +87,7 @@ func (s *Service) RotateOrRekeyEncryptedTerraformResourceHcl(
 	pubKey *stdRsa.PublicKey,
 	encryptedPassphraseSvc EncryptedPassphraseService,
 	encryptedPayloadSvc EncryptedPayloadService,
-) (*ast.File, error) {
+) (*hclwrite.File, error) {
 	return s.terraformSvc.ModifyInPlaceHclAst(
 		hclParser,
 		hclBytes,
@@ -110,122 +105,67 @@ func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
 	pubKey *stdRsa.PublicKey,
 	encryptedPassphraseSvc EncryptedPassphraseService,
 	encryptedPayloadSvc EncryptedPayloadService,
-) func(item *ast.ObjectItem) error {
-	return func(item *ast.ObjectItem) error {
+) func(block *hclwrite.Block) error {
+	return func(block *hclwrite.Block) error {
+		if block.Type() != resourceType {
+			return nil
+		}
+
 		// NOTE: We're only interested in
-		// `"resource" "resource_type" "resource_name"`
-		// HCL AST, which is exactly of length 3.
-		if len(item.Keys) != 3 {
+		//  "resource_type" "resource_name"`
+		labels := block.Labels()
+		if len(labels) != 2 {
 			return nil
 		}
 
-		// NOTE: Only resources of `vaulted_vault_secret` are rotatable
-		if item.Keys[0].Token.Value() != resourceTypeName ||
-			item.Keys[1].Token.Value() != vaultedVaultResourceTypeName {
+		if labels[0] != vaultedVaultSecretResourceType {
 			return nil
 		}
 
-		itemValObject, ok := item.Val.(*ast.ObjectType)
-		if !ok {
-			return stacktrace.NewError(
-				"HCL resource `vaulted_vault_secret` `%s` value is not an object type. "+
-					"It's actually %#v",
-				item.Keys[2].Token.Text,
-				item.Val,
-			)
-		}
-
-		// NOTE: Expected `vaulted_vault_secret` resource to have content with keys for:
-		// * path
-		// * payload_json
-		if len(itemValObject.List.Items) != 2 {
-			return stacktrace.NewError(
-				"HCL resource `vaulted_vault_secret` `%s` content is "+
-					"likely malformed. Expected exactly 2 key-value pairs",
-				item.Keys[2].Token.Text,
-			)
-		}
-
-		var tfPath, tfPayloadJSON string
-
-		for _, itemObj := range itemValObject.List.Items {
-			var err error
-
-			// NOTE: This is very dangerous due to implementation details of `Value`,
-			// it panics if it's invalid.
-			// Although it's not possible (in current terraform HCL revision) to have
-			// a valid HCL that accepts a key that's non-string. it's good to have it in mind in future.
-			itemObjKey, ok := itemObj.Keys[0].Token.Value().(string)
-			if !ok {
-				return stacktrace.Propagate(
-					err,
-					"non-string key for"+
-						"`vaulted_vault_secret` `%s`. Key: %#v",
-					item.Keys[2].Token.Text,
-					itemObj.Keys[0].Token.Value(),
-				)
-			}
-
-			if itemObjKey == pathKeyName {
-				tfPath, err = s.getStringValueOfHCLobjectItemKey(itemObj)
-				if err != nil {
-					return stacktrace.Propagate(
-						err,
-						"failed to get `path` string value for "+
-							"`vaulted_vault_secret` `%s`",
-						item.Keys[2].Token.Text,
-					)
-				}
-			} else if itemObjKey == "payload_json" {
-				tfPayloadJSON, err = s.getStringValueOfHCLobjectItemKey(itemObj)
-				if err != nil {
-					return stacktrace.Propagate(
-						err,
-						"failed to get `payload_json` string value for "+
-							"`vaulted_vault_secret` `%s`",
-						item.Keys[2].Token.Text,
-					)
-				}
-			}
-		}
-
-		if len(tfPath) == 0 {
-			return stacktrace.NewError(
-				"empty `path` string value for `vaulted_vault_secret` `%s`",
-				item.Keys[2].Token.Text,
-			)
-		}
-
-		if len(tfPayloadJSON) == 0 {
-			return stacktrace.NewError(
-				"empty `payload_json` string value for `vaulted_vault_secret` `%s`",
-				item.Keys[2].Token.Text,
-			)
-		}
-
-		oldEncryptedPayload, err := encryptedPayloadSvc.Deserialize([]byte(tfPayloadJSON))
+		previousEncPayload, startTokenPos, endTokenPos, err := s.readHclQuoteLitAttr(
+			block,
+			"payload_json",
+		)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to deserialize `payload_json` for "+
-					"`vaulted_vault_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to read `payload_json` attr value for `%s.%s`",
+				vaultedVaultSecretResourceType,
+				labels[1],
+			)
+		}
+
+		if len(previousEncPayload) == 0 {
+			return stacktrace.NewError(
+				"empty `payload_json` attr value for `%s.%s`",
+				vaultedVaultSecretResourceType,
+				labels[1],
+			)
+		}
+
+		oldEncryptedPayload, err := encryptedPayloadSvc.Deserialize(previousEncPayload)
+		if err != nil {
+			return stacktrace.NewError(
+				"failed to deserialize `payload_json` attr's value for `%s.%s`",
+				vaultedVaultSecretResourceType,
+				labels[1],
 			)
 		}
 
 		oldPayload, err := encryptedPayloadSvc.Decrypt(privKey, oldEncryptedPayload)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to decrypt `payload_json` for "+
-					"`vaulted_vault_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to decrypt `payload_json` attr's value for `%s.%s`",
+				vaultedVaultSecretResourceType,
+				labels[1],
 			)
 		}
 
 		newPassphrase, err := encryptedPassphraseSvc.GeneratePassphrase(32)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to generate new passphrase for `vaulted_vault_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to generate new passphrase for `%s.%s`",
+				vaultedVaultSecretResourceType,
+				labels[1],
 			)
 		}
 
@@ -233,26 +173,30 @@ func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
 		// and encrypt the payload anew.
 		oldPayload.Passphrase = newPassphrase
 
-		encryptedPayload, err := encryptedPayloadSvc.Encrypt(pubKey, oldPayload)
+		newEncryptedPayload, err := encryptedPayloadSvc.Encrypt(pubKey, oldPayload)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to encrypt new encrypted payload for `vaulted_vault_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to encrypt new encrypted payload for `%s.%s`",
+				vaultedVaultSecretResourceType,
+				labels[1],
 			)
 		}
 
-		serializedEncryptedPayload, err := encryptedPayloadSvc.Serialize(encryptedPayload)
+		serializedNewEncPayload, err := encryptedPayloadSvc.Serialize(newEncryptedPayload)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to serialize new encrypted payload for `vaulted_vault_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to serialize new encrypted payload for `%s.%s`",
+				vaultedVaultSecretResourceType,
+				labels[1],
 			)
 		}
 
-		// NOTE: Overwrite content to new `payload_json` value.
-		itemValObject.List.Items = s.writeVaultedVaultSecretASTitems(tfPath, serializedEncryptedPayload)
+		err = s.replaceHclQuoteLitAttr(block, "payload_json", serializedNewEncPayload, startTokenPos, endTokenPos)
 
-		return nil
+		return stacktrace.Propagate(err, "failed to set new encrypted payload's `payload_json` attr for `%s.%s`",
+			vaultedVaultSecretResourceType,
+			labels[1],
+		)
 	}
 }
 
@@ -262,157 +206,99 @@ func (s *Service) migrateEncryptedTerraformResourceHclObjectItemVisitor(
 	legacyEncryptedContentSvc EncryptedContentService,
 	encryptedPassphraseSvc EncryptedPassphraseService,
 	encryptedPayloadSvc EncryptedPayloadService,
-) func(item *ast.ObjectItem) error {
-	return func(item *ast.ObjectItem) error {
+) func(block *hclwrite.Block) error {
+	return func(block *hclwrite.Block) error {
+		if block.Type() != resourceType {
+			return nil
+		}
+
 		// NOTE: We're only interested in
-		// `"resource" "resource_type" "resource_name"`
-		// HCL AST, which is exactly of length 3.
-		if len(item.Keys) != 3 {
+		//  "resource_type" "resource_name"`
+		labels := block.Labels()
+		if len(labels) != 2 {
 			return nil
 		}
 
-		// NOTE: Only resources of `vault_encrypted_secret` are migratable
-		if item.Keys[0].Token.Value() != resourceTypeName ||
-			item.Keys[1].Token.Value() != vaultEncryptedSecretResourceTypeName {
+		if labels[0] != vaultEncryptedSecretResourceType {
 			return nil
 		}
 
-		itemValObject, ok := item.Val.(*ast.ObjectType)
-		if !ok {
-			return stacktrace.NewError(
-				"HCL resource `vault_encrypted_secret` `%s` value is not an object type. "+
-					"It's actually %#v",
-				item.Keys[2].Token.Text,
-				item.Val,
-			)
-		}
-
-		// NOTE: Expected `vault_encrypted_secret` resource to have content with keys for:
-		// * path
-		// * encrypted_passphrase
-		// * encrypted_data_json
-		if len(itemValObject.List.Items) != 3 {
-			return stacktrace.NewError(
-				"HCL resource `vault_encrypted_secret` `%s` content is "+
-					"likely malformed. Expected exactly 3 key-value pairs",
-				item.Keys[2].Token.Text,
-			)
-		}
-
-		var tfPath, tfEncryptedDataJSON, tfEncryptedPassphrase string
-
-		for _, itemObj := range itemValObject.List.Items {
-			var err error
-
-			// NOTE: This is very dangerous due to implementation details of `Value`,
-			// it panics if it's invalid.
-			// Although it's not possible (in current terraform HCL revision) to have
-			// a valid HCL that accepts a key that's non-string. it's good to have it in mind in future.
-			itemObjKey, ok := itemObj.Keys[0].Token.Value().(string)
-			if !ok {
-				return stacktrace.Propagate(
-					err,
-					"non-string key for"+
-						"`vault_encrypted_secret` `%s`. Key: %#v",
-					item.Keys[2].Token.Text,
-					itemObj.Keys[0].Token.Value(),
-				)
-			}
-
-			switch itemObjKey {
-			case pathKeyName:
-				tfPath, err = s.getStringValueOfHCLobjectItemKey(itemObj)
-				if err != nil {
-					return stacktrace.Propagate(
-						err,
-						"failed to get `path` string value for "+
-							"`vault_encrypted_secret` `%s`",
-						item.Keys[2].Token.Text,
-					)
-				}
-			case "encrypted_data_json":
-				tfEncryptedDataJSON, err = s.getStringValueOfHCLobjectItemKey(itemObj)
-				if err != nil {
-					return stacktrace.Propagate(
-						err,
-						"failed to get `encrypted_data_json` string value for "+
-							"`vault_encrypted_secret` `%s`",
-						item.Keys[2].Token.Text,
-					)
-				}
-			case "encrypted_passphrase":
-				tfEncryptedPassphrase, err = s.getStringValueOfHCLobjectItemKey(itemObj)
-				if err != nil {
-					return stacktrace.Propagate(
-						err,
-						"failed to get `encrypted_passphrase` string value for "+
-							"`vault_encrypted_secret` `%s`",
-						item.Keys[2].Token.Text,
-					)
-				}
-			}
-		}
-
-		if len(tfPath) == 0 {
-			return stacktrace.NewError(
-				"empty `path` string value for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
-			)
-		}
-
-		if len(tfEncryptedDataJSON) == 0 {
-			return stacktrace.NewError(
-				"empty `encrypted_data_json` string value for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
-			)
-		}
-
-		if len(tfEncryptedPassphrase) == 0 {
-			return stacktrace.NewError(
-				"empty `encrypted_passphrase` string value for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
-			)
-		}
-
-		legacyEncryptedPassphrase, err := encryptedPassphraseSvc.Deserialize(
-			[]byte(tfEncryptedPassphrase),
-		)
+		oldEncryptedDataJSON, _, _, err := s.readHclQuoteLitAttr(block, "encrypted_data_json")
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to deserialize `encrypted_passphrase` for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to read `encrypted_data_json` attr value for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
+			)
+		}
+
+		if len(oldEncryptedDataJSON) == 0 {
+			return stacktrace.NewError(
+				"empty `encrypted_data_json` attr value for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
+			)
+		}
+
+		oldEncryptedPassphrase, _, _, err := s.readHclQuoteLitAttr(block, "encrypted_passphrase")
+		if err != nil {
+			return stacktrace.NewError(
+				"failed to read `encrypted_passphrase` attr value for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
+			)
+		}
+
+		if len(oldEncryptedPassphrase) == 0 {
+			return stacktrace.NewError(
+				"empty `encrypted_passphrase` attr value for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
+			)
+		}
+
+		legacyEncryptedPassphrase, err := encryptedPassphraseSvc.Deserialize(oldEncryptedPassphrase)
+		if err != nil {
+			return stacktrace.NewError(
+				"failed to deserialize `encrypted_passphrase` attr value for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
 			)
 		}
 
 		legacyPassphrase, err := encryptedPassphraseSvc.Decrypt(privKey, legacyEncryptedPassphrase)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to decrypt `encrypted_passphrase` for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to decrypt `encrypted_passphrase` attr value for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
 			)
 		}
 
-		legacyEncryptedContent, err := legacyEncryptedContentSvc.Deserialize([]byte(tfEncryptedDataJSON))
+		legacyEncryptedContent, err := legacyEncryptedContentSvc.Deserialize(oldEncryptedDataJSON)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to deserialize `encrypted_data_json` for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to deserialize `encrypted_data_json` attr value for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
 			)
 		}
 
 		content, err := legacyEncryptedContentSvc.Decrypt(legacyPassphrase, legacyEncryptedContent)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to decrypt `encrypted_data_json` for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to decrypt `encrypted_data_json` attr value for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
 			)
 		}
 
 		newPassphrase, err := encryptedPassphraseSvc.GeneratePassphrase(32)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to generate new encrypted passphrase for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to generate new encrypted passphrase for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
 			)
 		}
 
@@ -425,163 +311,61 @@ func (s *Service) migrateEncryptedTerraformResourceHclObjectItemVisitor(
 		encryptedPayload, err := encryptedPayloadSvc.Encrypt(pubKey, payload)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to encrypt new encrypted payload for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to encrypt new encrypted payload for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
 			)
 		}
 
 		serializedEncryptedPayload, err := encryptedPayloadSvc.Serialize(encryptedPayload)
 		if err != nil {
 			return stacktrace.NewError(
-				"failed to serialize new encrypted payload for `vault_encrypted_secret` `%s`",
-				item.Keys[2].Token.Text,
+				"failed to serialize new encrypted payload for `%s.%s`",
+				vaultEncryptedSecretResourceType,
+				labels[1],
 			)
 		}
 
-		// NOTE: Change the type of the resource to new one
-		item.Keys[1].Token.Text = `"vaulted_vault_secret"`
+		blockBody := block.Body()
+		labels[0] = "vaulted_vault_secret"
+		block.SetLabels(labels)
 
-		// NOTE: Start overwriting content to new encryption-usage resource `vaulted_vault_secret` format.
-		itemValObject.List.Items = s.writeVaultedVaultSecretASTitems(tfPath, serializedEncryptedPayload)
+		// NOTE: Adapt to resource `vaulted_vault_secret` format.
+		blockBody.RemoveAttribute("encrypted_data_json")
+		blockBody.RemoveAttribute("encrypted_passphrase")
+		blockBody.SetAttributeValue("encrypted_payload", cty.StringVal(string(serializedEncryptedPayload)))
 
 		return nil
 	}
 }
 
-func (s *Service) getStringValueOfHCLobjectItemKey(itemObj *ast.ObjectItem) (string, error) {
-	literalType, ok := itemObj.Val.(*ast.LiteralType)
-	if !ok {
-		return "", stacktrace.NewError(
-			"HCL resource value is not a literal type. It's a %#v.",
-			itemObj.Val,
-		)
-	}
-
-	if literalType.Token.Type != token.STRING {
-		return "", stacktrace.NewError(
-			"HCL resource value is not a string literal type. It's a %#v.",
-			literalType.Token.Type,
-		)
-	}
-
-	actualText := strings.TrimPrefix(literalType.Token.Text, `"`)
-	actualText = strings.TrimSuffix(actualText, `"`)
-
-	return actualText, nil
-}
-
-func (s *Service) ConvertIniContentToLegacyTerraformContent(
-	passphraseLength int,
-	iniContent *ini.Content,
-	pubKey *stdRsa.PublicKey,
-	encryptedPassphraseSvc EncryptedPassphraseService,
-	encryptedContentSvc EncryptedContentService,
-) (*terraform.Content, error) {
-	terraformContent := terraform.NewTerraformContent()
-
-	for name, section := range iniContent.SectionsByName {
-		for _, sectionValue := range section.Values {
-			resourceName := fmt.Sprintf("%s/%s", name, sectionValue.KeyName)
-			terraformResource := terraform.NewTerraformResource(
-				fmt.Sprintf(
-					"vault_encrypted_secret_%s",
-					strings.ReplaceAll(resourceName, "/", "_"),
-				),
-				"vault_encrypted_secret",
-			)
-
-			valueMap := map[string]interface{}{
-				"value": sectionValue.Value,
-			}
-
-			dataJSON, err := json.Marshal(valueMap)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to marshal in JSON value for section: %s, key: %s",
-					name,
-					sectionValue.KeyName,
-				)
-			}
-
-			passphrase, err := encryptedPassphraseSvc.GeneratePassphrase(passphraseLength)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to generate random passphrase",
-				)
-			}
-
-			encryptedPassphrase, err := encryptedPassphraseSvc.Encrypt(pubKey, passphrase)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to encrypt generated passphrase with specified public key",
-				)
-			}
-
-			serializedEncPassphrase, err := encryptedPassphraseSvc.Serialize(encryptedPassphrase)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to serialize encrypted passphrase",
-				)
-			}
-
-			content := content.NewContent(dataJSON)
-
-			encryptedContent, err := encryptedContentSvc.Encrypt(passphrase, content)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to encrypt content from section: %s, key: %s",
-					name,
-					sectionValue.KeyName,
-				)
-			}
-
-			serializedEncContent, err := encryptedContentSvc.Serialize(encryptedContent)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to serialize encrypted content",
-				)
-			}
-
-			path := fmt.Sprintf("secret/%s", resourceName)
-			terraformResource.Content = map[string]string{
-				"path":                 path,
-				"encrypted_data_json":  string(serializedEncContent),
-				"encrypted_passphrase": string(serializedEncPassphrase),
-			}
-
-			terraformContent.AddResource(terraformResource)
-		}
-	}
-
-	return terraformContent, nil
-}
-
-func (s *Service) ConvertIniContentToV1TerraformContent(
+func (s *Service) ConvertIniContentToV1ResourceHCL(
 	passphraseLength int,
 	iniContent *ini.Content,
 	pubKey *stdRsa.PublicKey,
 	encryptedPassphraseSvc EncryptedPassphraseService,
 	encryptedPayloadSvc EncryptedPayloadService,
-) (*terraform.Content, error) {
-	terraformContent := terraform.NewTerraformContent()
+) (*hclwrite.File, error) {
+	hclFile := hclwrite.NewEmptyFile()
+
+	blocksByResourceName := make(map[string]*hclwrite.Block)
+	sortedResourceNames := make([]string, 0)
 
 	for name, section := range iniContent.SectionsByName {
 		for _, sectionValue := range section.Values {
-			resourceName := fmt.Sprintf("%s/%s", name, sectionValue.KeyName)
-			terraformResource := terraform.NewTerraformResource(
-				fmt.Sprintf(
-					"vaulted_vault_secret_%s",
-					strings.ReplaceAll(resourceName, "/", "_"),
-				),
-				"vaulted_vault_secret",
-			)
+			iniPath := fmt.Sprintf("%s/%s", name, sectionValue.KeyName)
+			resourceName := strings.ReplaceAll(iniPath, "/", "_")
 
+			block := hclwrite.NewBlock(
+				"resource",
+				[]string{
+					"vaulted_vault_secret",
+					fmt.Sprintf(
+						"vaulted_vault_secret_%s",
+						resourceName,
+					),
+				},
+			)
 			valueMap := map[string]interface{}{
 				"value": sectionValue.Value,
 			}
@@ -604,13 +388,13 @@ func (s *Service) ConvertIniContentToV1TerraformContent(
 				)
 			}
 
-			payload := payload.NewPayload(
+			payloadInstance := payload.NewPayload(
 				header.NewHeader(),
 				passphrase,
 				content.NewContent(dataJSON),
 			)
 
-			encPayload, err := encryptedPayloadSvc.Encrypt(pubKey, payload)
+			encPayload, err := encryptedPayloadSvc.Encrypt(pubKey, payloadInstance)
 			if err != nil {
 				return nil, stacktrace.Propagate(
 					err,
@@ -628,54 +412,109 @@ func (s *Service) ConvertIniContentToV1TerraformContent(
 				)
 			}
 
-			path := fmt.Sprintf("secret/%s", resourceName)
-			terraformResource.Content = map[string]string{
-				"path":         path,
-				"payload_json": string(serializedEncPayload),
-			}
+			path := fmt.Sprintf("secret/%s", iniPath)
 
-			terraformContent.AddResource(terraformResource)
+			blockBody := block.Body()
+			blockBody.SetAttributeValue("path", cty.StringVal(path))
+			blockBody.SetAttributeValue("payload_json", cty.StringVal(string(serializedEncPayload)))
+
+			blocksByResourceName[resourceName] = block
+
+			sortedResourceNames = append(sortedResourceNames, resourceName)
 		}
 	}
 
-	return terraformContent, nil
+	// NOTE: Always add the resources alphabetically for consistency.
+	sort.Strings(sortedResourceNames)
+
+	for _, resourceName := range sortedResourceNames {
+		block := blocksByResourceName[resourceName]
+		hclFile.Body().AppendBlock(block)
+	}
+
+	return hclFile, nil
 }
 
-func (s *Service) writeVaultedVaultSecretASTitems(path string, serializedPayloadJSON []byte) []*ast.ObjectItem {
-	return []*ast.ObjectItem{
-		{
-			Keys: []*ast.ObjectKey{
-				{
-					Token: token.Token{
-						Text: `"path"`,
-						Type: token.STRING,
-					},
-				},
-			},
-			Assign: hclEqualSign,
-			Val: &ast.LiteralType{
-				Token: token.Token{
-					Text: fmt.Sprintf(`"%s"`, path),
-					Type: token.STRING,
-				},
-			},
-		},
-		{
-			Keys: []*ast.ObjectKey{
-				{
-					Token: token.Token{
-						Text: `"payload_json"`,
-						Type: token.STRING,
-					},
-				},
-			},
-			Assign: hclEqualSign,
-			Val: &ast.LiteralType{
-				Token: token.Token{
-					Text: fmt.Sprintf(`"%s"`, serializedPayloadJSON),
-					Type: token.STRING,
-				},
-			},
-		},
+func (s *Service) readHclQuoteLitAttr(block *hclwrite.Block, name string) ([]byte, int, int, error) {
+	blockBody := block.Body()
+	if blockBody == nil {
+		return nil, -1, -1, stacktrace.NewError("value is not an object type. It's actually empty")
 	}
+
+	attr := blockBody.GetAttribute(name)
+	if attr == nil {
+		return nil, -1, -1, stacktrace.NewError("no HCL attr with given name")
+	}
+
+	expr := attr.Expr()
+	tokens := expr.BuildTokens(nil)
+
+	if len(expr.Variables()) > 0 {
+		return nil, -1, -1, stacktrace.NewError(
+			"attr uses variables/locals. It's unsafe to modify, remove the variables/locals usage",
+		)
+	}
+
+	startingTokenPos := -1
+	endTokenPos := -1
+
+	for i, token := range tokens {
+		if startingTokenPos == -1 {
+			if token.Type == hclsyntax.TokenOQuote {
+				// NOTE: Found potential start of string
+				startingTokenPos = i
+				continue
+			}
+		} else if token.Type == hclsyntax.TokenCQuote {
+			endTokenPos = i
+		}
+	}
+
+	if startingTokenPos == -1 {
+		return nil, startingTokenPos, endTokenPos, stacktrace.NewError(
+			"attr looks like it's not a string",
+		)
+	}
+
+	if endTokenPos == -1 {
+		return nil, startingTokenPos, endTokenPos, stacktrace.NewError(
+			"attr looks like it's an incomplete/unclosed string",
+		)
+	}
+
+	// NOTE: slice with +1 at start to exclude opening quotes
+	stringTokens := tokens[startingTokenPos+1 : endTokenPos]
+
+	return stringTokens.Bytes(), startingTokenPos, endTokenPos, nil
+}
+
+func (s *Service) replaceHclQuoteLitAttr(
+	block *hclwrite.Block,
+	name string,
+	value []byte,
+	startTokenPos,
+	endTokenPos int,
+) error {
+	blockBody := block.Body()
+	if blockBody == nil {
+		return stacktrace.NewError("value is not an object type. It's actually empty")
+	}
+
+	attr := blockBody.GetAttribute(name)
+	expr := attr.Expr()
+	tokens := expr.BuildTokens(nil)
+
+	cleanTokens := append(tokens[:startTokenPos+1], tokens[endTokenPos:]...)
+	insertPos := startTokenPos + 1
+	cleanTokens = append(cleanTokens[:insertPos+1], cleanTokens[insertPos:]...)
+	cleanTokens[insertPos] = &hclwrite.Token{
+		Type:  hclsyntax.TokenQuotedLit,
+		Bytes: value,
+		// NOTE: Prettify
+		SpacesBefore: 1,
+	}
+
+	blockBody.SetAttributeRaw(name, cleanTokens)
+
+	return nil
 }

@@ -15,9 +15,7 @@
 package test
 
 import (
-	"io"
-
-	"github.com/hashicorp/hcl/hcl/ast"
+	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -25,7 +23,7 @@ type MockHclParser struct {
 	mock.Mock
 }
 
-func (m *MockHclParser) Parse(src []byte) (*ast.File, error) {
+func (m *MockHclParser) Parse(src []byte) (*hclwrite.Block, error) {
 	args := m.Called(src)
 	returnValue := args.Get(0)
 
@@ -35,14 +33,5 @@ func (m *MockHclParser) Parse(src []byte) (*ast.File, error) {
 		return nil, err
 	}
 
-	return returnValue.(*ast.File), nil
-}
-
-type MockHclPrinter struct {
-	mock.Mock
-}
-
-func (m *MockHclPrinter) Fprint(output io.Writer, node ast.Node) error {
-	args := m.Called(output, node)
-	return args.Error(0)
+	return returnValue.(*hclwrite.Block), nil
 }

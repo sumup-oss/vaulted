@@ -21,49 +21,11 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/sumup-oss/vaulted/pkg/hcl"
-	"github.com/sumup-oss/vaulted/pkg/ini"
-	"github.com/sumup-oss/vaulted/pkg/terraform"
 	"github.com/sumup-oss/vaulted/pkg/terraform_encryption_migration"
 )
 
 type MockTerraformEncryptionMigrationService struct {
 	mock.Mock
-}
-
-func (m *MockTerraformEncryptionMigrationService) ConvertIniContentToLegacyTerraformContent(
-	passphraseLength int,
-	iniContent *ini.Content,
-	pubKey *rsa.PublicKey,
-	encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
-	encryptedContentSvc terraform_encryption_migration.EncryptedContentService,
-) (*terraform.Content, error) {
-	args := m.Called(passphraseLength, iniContent, pubKey, encryptedPassphraseSvc, encryptedContentSvc)
-	returnValue := args.Get(0)
-	err := args.Error(1)
-
-	if returnValue == nil {
-		return nil, err
-	}
-
-	return returnValue.(*terraform.Content), nil
-}
-
-func (m *MockTerraformEncryptionMigrationService) ConvertIniContentToV1TerraformContent(
-	passphraseLength int,
-	iniContent *ini.Content,
-	pubKey *rsa.PublicKey,
-	encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
-	encryptedPayloadSvc terraform_encryption_migration.EncryptedPayloadService,
-) (*terraform.Content, error) {
-	args := m.Called(passphraseLength, iniContent, pubKey, encryptedPassphraseSvc, encryptedPayloadSvc)
-	returnValue := args.Get(0)
-	err := args.Error(1)
-
-	if returnValue == nil {
-		return nil, err
-	}
-
-	return returnValue.(*terraform.Content), nil
 }
 
 func (m *MockTerraformEncryptionMigrationService) MigrateEncryptedTerraformResourceHcl(

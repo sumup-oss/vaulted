@@ -30,7 +30,6 @@ func NewMigrateCommand(
 	legacyEncryptedContentSvc external_interfaces.EncryptedContentService,
 	v1EncryptedPayloadSvc external_interfaces.EncryptedPayloadService,
 	hclSvc external_interfaces.HclService,
-	tfSvc external_interfaces.TerraformService,
 	tfEncryptionMigrationSvc external_interfaces.TerraformEncryptionMigrationService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
@@ -106,9 +105,7 @@ func NewMigrateCommand(
 			return cli.WriteHCLout(
 				osExecutor,
 				cmdInstance.Flag("out").Value.String(),
-				hclSvc,
 				hclFile,
-				tfSvc,
 			)
 		},
 	}

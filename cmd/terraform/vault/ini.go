@@ -29,7 +29,6 @@ func NewIniCommand(
 	encryptedPassphraseSvc external_interfaces.EncryptedPassphraseService,
 	encryptedPayloadSvc external_interfaces.EncryptedPayloadService,
 	hclSvc external_interfaces.HclService,
-	terraformSvc external_interfaces.TerraformService,
 	terraformEncryptionMigrationSvc external_interfaces.TerraformEncryptionMigrationService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
@@ -60,7 +59,7 @@ func NewIniCommand(
 
 			iniContent := iniSvc.ParseIniFileContents(iniFile)
 
-			terraformContent, err := terraformEncryptionMigrationSvc.ConvertIniContentToV1TerraformContent(
+			hclFile, err := terraformEncryptionMigrationSvc.ConvertIniContentToV1ResourceHCL(
 				32,
 				iniContent,
 				pubKey,
@@ -70,31 +69,12 @@ func NewIniCommand(
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
-					"failed to convert INI content to terraform content",
-				)
-			}
-
-			hclFile, err := terraformSvc.TerraformContentToHCLfile(
-				hclSvc,
-				terraformContent,
-			)
-			if err != nil {
-				return stacktrace.Propagate(
-					err,
-					"failed to transform terraform content to HCL",
+					"failed to transform INI content to HCL",
 				)
 			}
 
 			outPath := cmdInstance.Flag("out").Value.String()
-			outFile, err := osExecutor.Create(outPath)
-			if err != nil {
-				return stacktrace.Propagate(
-					err,
-					"failed to create file at 'out' path",
-				)
-			}
-
-			err = terraformSvc.WriteHCLfile(hclSvc, hclFile, outFile)
+			err = osExecutor.WriteFile(outPath, hclFile.Bytes(), 0755)
 			return stacktrace.Propagate(
 				err,
 				"failed to write HCL to file",

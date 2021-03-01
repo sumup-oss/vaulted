@@ -53,9 +53,14 @@ Change line format:
 
 ## Unreleased (master)
 
+### Changed
+
+* Replaced HCLv1 parser with HCLv2 one ; Ref: https://github.com/sumup-oss/vaulted/pull/16
+
 ### Removed
 
 * Commands from `legacy` sub-command are now removed. We're not using them internally. The migration from legacy to v1 secret format command(s) are there to help you transition ; Ref: https://github.com/sumup-oss/vaulted/pull/15
+* HCLv1 parsing and support for Terraform earlier than 0.12 ; Ref: https://github.com/sumup-oss/vaulted/pull/16
 
 ## v0.3.0
 

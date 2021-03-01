@@ -17,7 +17,7 @@ package terraform_encryption_migration
 import (
 	stdRsa "crypto/rsa"
 
-	"github.com/hashicorp/hcl/hcl/ast"
+	"github.com/hashicorp/hcl/v2/hclwrite"
 
 	"github.com/sumup-oss/vaulted/pkg/hcl"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
@@ -29,8 +29,8 @@ type terraformService interface {
 	ModifyInPlaceHclAst(
 		hclParser hcl.Parser,
 		hclBytes []byte,
-		objectItemVisitorFunc func(item *ast.ObjectItem) error,
-	) (*ast.File, error)
+		blockItemVisitorFunc func(block *hclwrite.Block) error,
+	) (*hclwrite.File, error)
 }
 
 type EncryptedContentService interface {

@@ -20,6 +20,7 @@ import (
 	"log"
 	stdOs "os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 
 	"github.com/palantir/stacktrace"
@@ -27,7 +28,8 @@ import (
 )
 
 const (
-	pkgPath = "github.com/sumup-oss/vaulted"
+	pkgPath             = "github.com/sumup-oss/vaulted"
+	windowsBinarySuffix = ".exe"
 )
 
 type Build struct {
@@ -88,12 +90,21 @@ func GoBuild(osExecutor os.OsExecutor) string {
 		log.Fatal(err)
 	}
 
+	var binaryPath string
+
+	if stdOs.Getenv("GOROOT") == "" {
+		binaryPath = "go"
+	} else {
+		binaryPath = filepath.Join(stdOs.Getenv("GOROOT"), "bin", "go")
+	}
+
 	if runtime.GOOS == "windows" {
-		tmpFilename += ".exe"
+		binaryPath += windowsBinarySuffix
+		tmpFilename += windowsBinarySuffix
 	}
 
 	cmd := exec.Command(
-		"go",
+		binaryPath,
 		"build",
 		"-v",
 		"-o",
