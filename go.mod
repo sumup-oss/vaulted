@@ -10,7 +10,7 @@ require (
 	github.com/spf13/cobra v0.0.7
 	github.com/stretchr/testify v1.7.0
 	github.com/sumup-oss/go-pkgs v0.0.0-20190422205605-69621402744f
-	github.com/zclconf/go-cty v1.8.3
+	github.com/zclconf/go-cty v1.9.0
 	gopkg.in/ini.v1 v1.42.0 // indirect
 )
 
