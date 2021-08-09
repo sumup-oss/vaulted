@@ -16,14 +16,10 @@ package external_interfaces
 
 import (
 	stdRsa "crypto/rsa"
+	"hash"
 	"io"
 
-	goIni "github.com/go-ini/ini"
-	"github.com/hashicorp/hcl/v2/hclwrite"
-
 	"github.com/sumup-oss/vaulted/pkg/hcl"
-	"github.com/sumup-oss/vaulted/pkg/ini"
-	"github.com/sumup-oss/vaulted/pkg/terraform_encryption_migration"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
@@ -42,16 +38,21 @@ type EncryptedPassphraseService interface {
 	GeneratePassphrase(length int) (*passphrase.Passphrase, error)
 	Serialize(encryptedPassphrase *passphrase.EncryptedPassphrase) ([]byte, error)
 	Deserialize(encoded []byte) (*passphrase.EncryptedPassphrase, error)
-	Encrypt(publicKey *stdRsa.PublicKey, passphrase *passphrase.Passphrase) (*passphrase.EncryptedPassphrase, error)
+	Encrypt(
+		useOAEP bool,
+		publicKey *stdRsa.PublicKey,
+		passphrase *passphrase.Passphrase,
+	) (*passphrase.EncryptedPassphrase, error)
 	Decrypt(
+		kmsKeyID string,
 		privateKey *stdRsa.PrivateKey,
 		encryptedPassphrase *passphrase.EncryptedPassphrase,
 	) (*passphrase.Passphrase, error)
 }
 
 type EncryptedPayloadService interface {
-	Encrypt(publicKey *stdRsa.PublicKey, payload *payload.Payload) (*payload.EncryptedPayload, error)
-	Decrypt(privateKey *stdRsa.PrivateKey, encryptedPayload *payload.EncryptedPayload) (*payload.Payload, error)
+	Encrypt(useOAEP bool, publicKey *stdRsa.PublicKey, payload *payload.Payload) (*payload.EncryptedPayload, error)
+	Decrypt(kmsKeyID string, privateKey *stdRsa.PrivateKey, encryptedPayload *payload.EncryptedPayload) (*payload.Payload, error)
 	Serialize(encryptedPayload *payload.EncryptedPayload) ([]byte, error)
 	Deserialize(encodedContent []byte) (*payload.EncryptedPayload, error)
 }
@@ -69,38 +70,12 @@ type EncryptedContentService interface {
 	) (*content.Content, error)
 }
 
-type TerraformEncryptionMigrationService interface {
-	ConvertIniContentToV1ResourceHCL(
-		passphraseLength int,
-		iniContent *ini.Content,
-		pubKey *stdRsa.PublicKey,
-		encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
-		encryptedPayloadSvc terraform_encryption_migration.EncryptedPayloadService,
-	) (*hclwrite.File, error)
-	MigrateEncryptedTerraformResourceHcl(
-		hclParser hcl.Parser,
-		hclBytes []byte,
-		privKey *stdRsa.PrivateKey,
-		pubKey *stdRsa.PublicKey,
-		legacyEncryptedContentSvc terraform_encryption_migration.EncryptedContentService,
-		encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
-		encryptedPayloadSvc terraform_encryption_migration.EncryptedPayloadService,
-	) (*hclwrite.File, error)
-	RotateOrRekeyEncryptedTerraformResourceHcl(
-		hclParser hcl.Parser,
-		hclBytes []byte,
-		privKey *stdRsa.PrivateKey,
-		pubKey *stdRsa.PublicKey,
-		encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
-		encryptedPayloadSvc terraform_encryption_migration.EncryptedPayloadService,
-	) (*hclwrite.File, error)
-}
-
 type RsaService interface {
 	ReadPublicKeyFromPath(publicKeyPath string) (*stdRsa.PublicKey, error)
 	ReadPrivateKeyFromPath(privateKeyPath string) (*stdRsa.PrivateKey, error)
 	DecryptPKCS1v15(rand io.Reader, priv *stdRsa.PrivateKey, ciphertext []byte) ([]byte, error)
 	EncryptPKCS1v15(rand io.Reader, pub *stdRsa.PublicKey, msg []byte) ([]byte, error)
+	EncryptOAEP(hash hash.Hash, random io.Reader, pub *stdRsa.PublicKey, msg []byte, label []byte) ([]byte, error)
 }
 
 type AesService interface {
@@ -108,9 +83,4 @@ type AesService interface {
 	DecryptCBC(key []byte, ciphertext []byte) ([]byte, error)
 	EncryptGCM(key []byte, plaintext []byte) ([]byte, error)
 	DecryptGCM(key []byte, ciphertext []byte) ([]byte, error)
-}
-
-type IniService interface {
-	ReadIniAtPath(path string) (*goIni.File, error)
-	ParseIniFileContents(file *goIni.File) *ini.Content
 }

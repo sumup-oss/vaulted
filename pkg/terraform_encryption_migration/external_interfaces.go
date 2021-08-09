@@ -15,13 +15,9 @@
 package terraform_encryption_migration
 
 import (
-	stdRsa "crypto/rsa"
-
 	"github.com/hashicorp/hcl/v2/hclwrite"
 
 	"github.com/sumup-oss/vaulted/pkg/hcl"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
@@ -33,30 +29,10 @@ type terraformService interface {
 	) (*hclwrite.File, error)
 }
 
-type EncryptedContentService interface {
-	Encrypt(passphrase *passphrase.Passphrase, content *content.Content) (*content.EncryptedContent, error)
-	Decrypt(passphrase *passphrase.Passphrase, encryptedContent *content.EncryptedContent) (*content.Content, error)
-	Serialize(encryptedContent *content.EncryptedContent) ([]byte, error)
-	Deserialize(encoded []byte) (*content.EncryptedContent, error)
+type PayloadDecrypter interface {
+	Decrypt(encryptedPayload *payload.EncryptedPayload) (*payload.Payload, error)
 }
 
-type EncryptedPassphraseService interface {
-	Serialize(encryptedPassphrase *passphrase.EncryptedPassphrase) ([]byte, error)
-	Encrypt(
-		publicKey *stdRsa.PublicKey,
-		passphrase *passphrase.Passphrase,
-	) (*passphrase.EncryptedPassphrase, error)
-	Deserialize(encoded []byte) (*passphrase.EncryptedPassphrase, error)
-	Decrypt(
-		privateKey *stdRsa.PrivateKey,
-		encryptedPassphrase *passphrase.EncryptedPassphrase,
-	) (*passphrase.Passphrase, error)
-	GeneratePassphrase(length int) (*passphrase.Passphrase, error)
-}
-
-type EncryptedPayloadService interface {
-	Encrypt(publicKey *stdRsa.PublicKey, payload *payload.Payload) (*payload.EncryptedPayload, error)
-	Decrypt(privateKey *stdRsa.PrivateKey, encryptedPayload *payload.EncryptedPayload) (*payload.Payload, error)
-	Serialize(encryptedPayload *payload.EncryptedPayload) ([]byte, error)
-	Deserialize(encodedContent []byte) (*payload.EncryptedPayload, error)
+type PayloadEncrypter interface {
+	Encrypt(payload *payload.Payload) (*payload.EncryptedPayload, error)
 }

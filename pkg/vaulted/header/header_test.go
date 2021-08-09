@@ -22,8 +22,8 @@ import (
 func TestHeaderConstants(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "$VED", defaultName)
-	assert.Equal(t, "1.0", defaultVersion)
+	assert.Equal(t, "$VED", DefaultName)
+	assert.Equal(t, "1.0", DefaultVersion)
 }
 
 func TestNewHeader(t *testing.T) {
@@ -34,8 +34,8 @@ func TestNewHeader(t *testing.T) {
 
 			header := NewHeader()
 
-			assert.Equal(t, header.Name, defaultName)
-			assert.Equal(t, header.Version, defaultVersion)
+			assert.Equal(t, header.Name, DefaultName)
+			assert.Equal(t, header.Version, DefaultVersion)
 		},
 	)
 }

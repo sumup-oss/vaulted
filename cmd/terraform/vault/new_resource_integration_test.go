@@ -37,10 +37,6 @@ import (
 	"github.com/sumup-oss/vaulted/pkg/base64"
 	"github.com/sumup-oss/vaulted/pkg/pkcs7"
 	"github.com/sumup-oss/vaulted/pkg/rsa"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 func TestNewResourceCmd_Execute(t *testing.T) {
@@ -56,19 +52,12 @@ func TestNewResourceCmd_Execute(t *testing.T) {
 			b64Svc := base64.NewBase64Service()
 			rsaSvc := rsa.NewRsaService(osExecutor)
 			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-			encPassphraseSvc := passphrase.NewEncryptedPassphraseService(b64Svc, rsaSvc)
-			encContentSvc := content.NewV1EncryptedContentService(b64Svc, aesSvc)
-			encPayloadSvc := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encPassphraseSvc,
-				encContentSvc,
-			)
 
 			cmdInstance := NewNewResourceCommand(
 				osExecutor,
 				rsaSvc,
-				encPassphraseSvc,
-				encPayloadSvc,
+				b64Svc,
+				aesSvc,
 			)
 
 			_, err := gopkgsTestUtils.RunCommandInSameProcess(
@@ -122,22 +111,12 @@ func TestNewResourceCmd_Execute(t *testing.T) {
 			rsaSvc := rsa.NewRsaService(realOsExecutor)
 			b64Svc := base64.NewBase64Service()
 
-			encPassphraseSvc := passphrase.NewEncryptedPassphraseService(b64Svc, rsaSvc)
-
-			aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-			encContentSvc := content.NewV1EncryptedContentService(b64Svc, aesSvc)
-			encPayloadSvc := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encPassphraseSvc,
-				encContentSvc,
-			)
-
 			outPathFlag := filepath.Join(tmpDir, "out.tf")
 			cmdInstance := NewNewResourceCommand(
 				realOsExecutor,
 				rsaSvc,
-				encPassphraseSvc,
-				encPayloadSvc,
+				b64Svc,
+				aes.NewAesService(pkcs7.NewPkcs7Service()),
 			)
 
 			pathArg := "secret/exampleapp/example"

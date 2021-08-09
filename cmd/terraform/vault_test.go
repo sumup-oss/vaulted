@@ -24,15 +24,8 @@ import (
 	"github.com/sumup-oss/vaulted/pkg/aes"
 	"github.com/sumup-oss/vaulted/pkg/base64"
 	"github.com/sumup-oss/vaulted/pkg/hcl"
-	"github.com/sumup-oss/vaulted/pkg/ini"
 	"github.com/sumup-oss/vaulted/pkg/pkcs7"
 	"github.com/sumup-oss/vaulted/pkg/rsa"
-	"github.com/sumup-oss/vaulted/pkg/terraform"
-	"github.com/sumup-oss/vaulted/pkg/terraform_encryption_migration"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 func TestNewVaultCmd(t *testing.T) {
@@ -42,27 +35,14 @@ func TestNewVaultCmd(t *testing.T) {
 	b64Svc := base64.NewBase64Service()
 	rsaSvc := rsa.NewRsaService(osExecutor)
 	aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-	encPassphraseSvc := passphrase.NewEncryptedPassphraseService(b64Svc, rsaSvc)
-	legacyEncContentSvc := content.NewLegacyEncryptedContentService(b64Svc, aesSvc)
-	encContentSvc := content.NewV1EncryptedContentService(b64Svc, aesSvc)
-	encPayloadSvc := payload.NewEncryptedPayloadService(
-		header.NewHeaderService(),
-		encPassphraseSvc,
-		encContentSvc,
-	)
 	hclSvc := hcl.NewHclService()
-	tfSvc := terraform.NewTerraformService()
-	tfEncMigrationSvc := terraform_encryption_migration.NewTerraformEncryptionMigrationService(tfSvc)
 
 	actual := NewVaultCmd(
 		osExecutor,
 		rsaSvc,
-		ini.NewIniService(),
-		encPassphraseSvc,
-		legacyEncContentSvc,
-		encPayloadSvc,
 		hclSvc,
-		tfEncMigrationSvc,
+		b64Svc,
+		aesSvc,
 	)
 
 	assert.Equal(t, "vault", actual.Use)
@@ -79,27 +59,14 @@ func TestVaultCmd_Execute(t *testing.T) {
 	b64Svc := base64.NewBase64Service()
 	rsaSvc := rsa.NewRsaService(osExecutor)
 	aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-	encPassphraseSvc := passphrase.NewEncryptedPassphraseService(b64Svc, rsaSvc)
-	encContentSvc := content.NewV1EncryptedContentService(b64Svc, aesSvc)
-	encPayloadSvc := payload.NewEncryptedPayloadService(
-		header.NewHeaderService(),
-		encPassphraseSvc,
-		encContentSvc,
-	)
 	hclSvc := hcl.NewHclService()
-	tfSvc := terraform.NewTerraformService()
-	legacyEncContentSvc := content.NewLegacyEncryptedContentService(b64Svc, aesSvc)
-	tfEncMigrationSvc := terraform_encryption_migration.NewTerraformEncryptionMigrationService(tfSvc)
 
 	cmdInstance := NewVaultCmd(
 		osExecutor,
 		rsaSvc,
-		ini.NewIniService(),
-		encPassphraseSvc,
-		legacyEncContentSvc,
-		encPayloadSvc,
 		hclSvc,
-		tfEncMigrationSvc,
+		b64Svc,
+		aesSvc,
 	)
 
 	_, err := gopkgsTestUtils.RunCommandInSameProcess(
@@ -118,8 +85,6 @@ Usage:
 
 Available Commands:
   help         Help about any command
-  ini          Convert an INI file to Terraform file
-  migrate      Reads terraform resources file and migrates them to new encryption format
   new-resource Create new terraform vaulted vault secret resource
   rekey        Rekey (decrypt and encrypt using different keypair) existing terraform resources
   rotate       Rotate (decrypt and encrypt) existing terraform resources

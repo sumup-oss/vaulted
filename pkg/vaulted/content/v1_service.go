@@ -20,13 +20,13 @@ import (
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
 )
 
-type V1EncryptedContentService struct {
+type V1Service struct {
 	*baseEncryptedContentService
 	aesService aesService
 }
 
-func NewV1EncryptedContentService(base64Service base64Service, aesService aesService) *V1EncryptedContentService {
-	return &V1EncryptedContentService{
+func NewV1Service(base64Service base64Service, aesService aesService) *V1Service {
+	return &V1Service{
 		baseEncryptedContentService: &baseEncryptedContentService{
 			base64Service: base64Service,
 		},
@@ -34,7 +34,7 @@ func NewV1EncryptedContentService(base64Service base64Service, aesService aesSer
 	}
 }
 
-func (s *V1EncryptedContentService) Encrypt(
+func (s *V1Service) Encrypt(
 	passphrase *passphrase.Passphrase,
 	content *Content,
 ) (*EncryptedContent, error) {
@@ -51,7 +51,7 @@ func (s *V1EncryptedContentService) Encrypt(
 	return encryptedContent, nil
 }
 
-func (s *V1EncryptedContentService) Decrypt(
+func (s *V1Service) Decrypt(
 	passphrase *passphrase.Passphrase,
 	encryptedContent *EncryptedContent,
 ) (*Content, error) {

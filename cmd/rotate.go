@@ -24,13 +24,16 @@ import (
 	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
 	"github.com/sumup-oss/vaulted/internal/cli"
 	"github.com/sumup-oss/vaulted/pkg/rsa"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 func NewRotateCommand(
 	osExecutor os.OsExecutor,
 	rsaSvc *rsa.Service,
-	encryptedPassphraseSvc external_interfaces.EncryptedPassphraseService,
-	encryptedPayloadSvc external_interfaces.EncryptedPayloadService,
+	b64Svc external_interfaces.Base64Service,
+	aesSvc external_interfaces.AesService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
 		Use: "rotate " +
@@ -42,7 +45,7 @@ func NewRotateCommand(
 		Long: "Rotate (decrypt and encrypt) a file/value using AES256-GCM symmetric encryption. " +
 			"Public key must originate from same private key, otherwise you probably want" +
 			"to use `rekey` instead. " +
-			"Passfile runtime random generated and encrypted with RSA asymmetric keypair.",
+			"Passphrase is runtime randomly generated and encrypted with RSA asymmetric keypair.",
 		RunE: func(cmdInstance *cobra.Command, args []string) error {
 			publicKeyPath := cmdInstance.Flag("public-key-path").Value.String()
 
@@ -98,7 +101,9 @@ func NewRotateCommand(
 				}
 			}
 
-			encryptedPayload, err := encryptedPayloadSvc.Deserialize(inFileContent)
+			payloadSerdeSvc := payload.NewSerdeService(b64Svc)
+
+			encryptedPayload, err := payloadSerdeSvc.Deserialize(inFileContent)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -106,7 +111,11 @@ func NewRotateCommand(
 				)
 			}
 
-			payload, err := encryptedPayloadSvc.Decrypt(privKey, encryptedPayload)
+			contentV1Svc := content.NewV1Service(b64Svc, aesSvc)
+			oldPassphraseDecrypter := passphrase.NewDecryptionRsaPKCS1v15Service(privKey, rsaSvc)
+			oldPayloadDecrypter := payload.NewDecryptionService(oldPassphraseDecrypter, contentV1Svc)
+
+			payloadInstance, err := oldPayloadDecrypter.Decrypt(encryptedPayload)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -114,7 +123,7 @@ func NewRotateCommand(
 				)
 			}
 
-			passphrase, err := encryptedPassphraseSvc.GeneratePassphrase(32)
+			passphraseInstance, err := passphrase.NewService().GeneratePassphrase(32)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -124,9 +133,12 @@ func NewRotateCommand(
 
 			// NOTE: Change passphrase with new one,
 			// and encrypt the payload anew.
-			payload.Passphrase = passphrase
+			payloadInstance.Passphrase = passphraseInstance
 
-			newEncryptedPayload, err := encryptedPayloadSvc.Encrypt(pubKey, payload)
+			passphraseEncrypter := passphrase.NewEncryptionRsaPKCS1v15Service(rsaSvc, pubKey)
+			payloadEncrypter := payload.NewEncryptionService(passphraseEncrypter, contentV1Svc)
+
+			newEncryptedPayload, err := payloadEncrypter.Encrypt(payloadInstance)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -134,7 +146,7 @@ func NewRotateCommand(
 				)
 			}
 
-			serializedEncryptedPayload, err := encryptedPayloadSvc.Serialize(newEncryptedPayload)
+			serializedEncryptedPayload, err := payloadSerdeSvc.Serialize(newEncryptedPayload)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -171,16 +183,16 @@ func NewRotateCommand(
 		"",
 		"Path to RSA public key used to encrypt runtime random generated passphrase.",
 	)
-	//nolint:errcheck
-	cmdInstance.MarkPersistentFlagRequired("public-key-path")
+
+	_ = cmdInstance.MarkPersistentFlagRequired("public-key-path")
 
 	cmdInstance.PersistentFlags().String(
 		"private-key-path",
 		"",
 		"Path to RSA private key used to decrypt specified `in` path content.",
 	)
-	//nolint:errcheck
-	cmdInstance.MarkPersistentFlagRequired("private-key-path")
+
+	_ = cmdInstance.MarkPersistentFlagRequired("private-key-path")
 
 	cmdInstance.PersistentFlags().String(
 		"in",

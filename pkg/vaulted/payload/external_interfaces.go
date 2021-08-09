@@ -15,40 +15,27 @@
 package payload
 
 import (
-	stdRsa "crypto/rsa"
-
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
 )
 
-type headerService interface {
-	Serialize(header *header.Header) ([]byte, error)
-	Deserialize(content string) (*header.Header, error)
+type contentEncrypter interface {
+	Encrypt(passphrase *passphrase.Passphrase, content *content.Content) (*content.EncryptedContent, error)
 }
 
-type encryptedPassphraseService interface {
-	Serialize(encryptedPassphrase *passphrase.EncryptedPassphrase) ([]byte, error)
-	Deserialize(encoded []byte) (*passphrase.EncryptedPassphrase, error)
-	Encrypt(
-		publicKey *stdRsa.PublicKey,
-		passphrase *passphrase.Passphrase,
-	) (*passphrase.EncryptedPassphrase, error)
-	Decrypt(
-		privateKey *stdRsa.PrivateKey,
-		encryptedPassphrase *passphrase.EncryptedPassphrase,
-	) (*passphrase.Passphrase, error)
+type contentDecrypter interface {
+	Decrypt(passphrase *passphrase.Passphrase, encryptedContent *content.EncryptedContent) (*content.Content, error)
 }
 
-type encryptedContentService interface {
-	Serialize(encryptedContent *content.EncryptedContent) ([]byte, error)
-	Deserialize(encoded []byte) (*content.EncryptedContent, error)
-	Encrypt(
-		passphrase *passphrase.Passphrase,
-		content *content.Content,
-	) (*content.EncryptedContent, error)
-	Decrypt(
-		passphrase *passphrase.Passphrase,
-		encryptedContent *content.EncryptedContent,
-	) (*content.Content, error)
+type passphraseEncrypter interface {
+	Encrypt(passphrase *passphrase.Passphrase) (*passphrase.EncryptedPassphrase, error)
+}
+
+type passphraseDecrypter interface {
+	Decrypt(encryptedPassphrase *passphrase.EncryptedPassphrase) (*passphrase.Passphrase, error)
+}
+
+type base64Serde interface {
+	Serialize(raw []byte) ([]byte, error)
+	Deserialize(encoded []byte) ([]byte, error)
 }

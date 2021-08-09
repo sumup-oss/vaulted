@@ -17,7 +17,9 @@ package rsa
 import (
 	"bytes"
 	"crypto/rsa"
+	"crypto/sha256"
 	"errors"
+	"hash"
 	"io"
 	"testing"
 
@@ -144,7 +146,7 @@ s/oC2WeIW+KwL2as5+Sw/KcoN3PqYxOLhMVaPiQAk2g=
 			actualReturn, actualErr := svc.ReadPublicKeyFromPath(publicKeyPathArg)
 			require.Nil(t, actualReturn)
 
-			assert.Contains(t, actualErr.Error(), "unable to parse PKCS1 public key")
+			assert.Contains(t, actualErr.Error(), "unable to parse PKIX public key")
 		},
 	)
 
@@ -463,6 +465,66 @@ func TestService_DecryptPKCS1v15(t *testing.T) {
 			assert.Equal(t, calledRand, randArg)
 			assert.Equal(t, calledPriv, privArg)
 			assert.Equal(t, calledCiphertext, ciphertextArg.Bytes())
+			assert.Equal(t, calledReturnBytes, actualBytes)
+		},
+	)
+}
+
+func TestService_EncryptOAEP(t *testing.T) {
+	t.Run(
+		"it uses builtin `rsaEncryptOAEP`",
+		func(t *testing.T) {
+			called := false
+			var calledHash hash.Hash
+			var calledRand io.Reader
+			var calledPub *rsa.PublicKey
+			var calledMsg []byte
+			var calledLabel []byte
+
+			calledReturnBytes := []byte{1, 2, 3}
+			var calledReturnErr error
+
+			realRsaEncryptOAEP := rsaEncryptOAEP
+			defer func() {
+				rsaEncryptOAEP = realRsaEncryptOAEP
+			}()
+
+			rsaEncryptOAEP = func(
+				hash hash.Hash,
+				rand io.Reader,
+				pub *rsa.PublicKey,
+				msg,
+				label []byte,
+			) (bytes []byte, e error) {
+				called = true
+				calledHash = hash
+				calledRand = rand
+				calledPub = pub
+				calledMsg = msg
+				calledLabel = label
+
+				return calledReturnBytes, calledReturnErr
+			}
+
+			hashArg := sha256.New()
+			randArg := bytes.NewReader(
+				bytes.NewBufferString("1234").Bytes(),
+			)
+			pubArg := &rsa.PublicKey{}
+			msgArg := bytes.NewBufferString("mymsg")
+			labelArg := []byte("exampleLabel")
+
+			svc := NewRsaService(&os.RealOsExecutor{})
+
+			actualBytes, err := svc.EncryptOAEP(hashArg, randArg, pubArg, msgArg.Bytes(), labelArg)
+			require.NoError(t, err)
+
+			assert.True(t, called)
+			assert.Equal(t, calledHash, hashArg)
+			assert.Equal(t, calledRand, randArg)
+			assert.Equal(t, calledPub, pubArg)
+			assert.Equal(t, calledMsg, msgArg.Bytes())
+			assert.Equal(t, calledLabel, labelArg)
 			assert.Equal(t, calledReturnBytes, actualBytes)
 		},
 	)

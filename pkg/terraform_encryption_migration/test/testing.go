@@ -15,62 +15,34 @@
 package test
 
 import (
-	"crypto/rsa"
-
 	"github.com/hashicorp/hcl/hcl/ast"
 	"github.com/stretchr/testify/mock"
 
 	"github.com/sumup-oss/vaulted/pkg/hcl"
 	"github.com/sumup-oss/vaulted/pkg/terraform_encryption_migration"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 type MockTerraformEncryptionMigrationService struct {
 	mock.Mock
 }
 
-func (m *MockTerraformEncryptionMigrationService) MigrateEncryptedTerraformResourceHcl(
-	hclParser hcl.Parser,
-	hclBytes []byte,
-	privKey *rsa.PrivateKey,
-	pubKey *rsa.PublicKey,
-	legacyEncryptedContentSvc terraform_encryption_migration.EncryptedContentService,
-	encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
-	encryptedPayloadSvc terraform_encryption_migration.EncryptedPayloadService,
-) (*ast.File, error) {
-	args := m.Called(
-		hclParser,
-		hclBytes,
-		privKey,
-		pubKey,
-		legacyEncryptedContentSvc,
-		encryptedPassphraseSvc,
-		encryptedPayloadSvc,
-	)
-	returnValue := args.Get(0)
-	err := args.Error(1)
-
-	if returnValue == nil {
-		return nil, err
-	}
-
-	return returnValue.(*ast.File), nil
-}
-
 func (m *MockTerraformEncryptionMigrationService) RotateOrRekeyEncryptedTerraformResourceHcl(
 	hclParser hcl.Parser,
 	hclBytes []byte,
-	privKey *rsa.PrivateKey,
-	pubKey *rsa.PublicKey,
-	encryptedPassphraseSvc terraform_encryption_migration.EncryptedPassphraseService,
-	encryptedPayloadSvc terraform_encryption_migration.EncryptedPayloadService,
+	passphraseSvc *passphrase.Service,
+	payloadSerdeSvc *payload.SerdeService,
+	oldPayloadDecrypter terraform_encryption_migration.PayloadDecrypter,
+	newPayloadEncrypter terraform_encryption_migration.PayloadEncrypter,
 ) (*ast.File, error) {
 	args := m.Called(
 		hclParser,
 		hclBytes,
-		privKey,
-		pubKey,
-		encryptedPassphraseSvc,
-		encryptedPayloadSvc,
+		passphraseSvc,
+		payloadSerdeSvc,
+		oldPayloadDecrypter,
+		newPayloadEncrypter,
 	)
 	returnValue := args.Get(0)
 	err := args.Error(1)

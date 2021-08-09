@@ -19,6 +19,7 @@ import (
 )
 
 var (
+	rsaEncryptOAEP     = rsa.EncryptOAEP
 	rsaEncryptPKCS1v15 = rsa.EncryptPKCS1v15
 	rsaDecryptPKCS1v15 = rsa.DecryptPKCS1v15
 )

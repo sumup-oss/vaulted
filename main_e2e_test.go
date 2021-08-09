@@ -332,15 +332,12 @@ func TestMvpWorkflow(t *testing.T) {
 	assert.Equal(t, inFileContent, rekeyDecryptOutContent)
 }
 
-// NOTE: Test the terraform workflow that is feasible when you're converting
-// "ini"-file based secrets to encrypted terraform resources.
+// NOTE: Test the terraform workflow that is feasible when you're producing terraform resources for `terraform-provider-vaulted`.
 // The flow is:
-// 1. terraform vault ini
-// 2. terraform vault migrate
 // TODO: When `terraform view` is added this will verify that the content is still decryptable and viewable.
-// 4. terraform vault new-resource
-// 5. terraform vault rotate
-// 6. terraform vault rekey
+// 1. terraform vault new-resource
+// 2. terraform vault rotate
+// 3. terraform vault rekey
 // TODO: Investigate why commands that are run do not output to neither stderr nor stdout.
 // Tests intentionally expect blank stdout/stderr, even though it's wrong,
 // to pass and later be able to correct to expected output.
@@ -360,79 +357,18 @@ func TestV1TerraformWorkflow(t *testing.T) {
 	privKeyPath, privKey := testutils.GenerateAndWritePrivateKey(t, tmpDir, "priv.key")
 	pubKeyPath := testutils.GenerateAndWritePublicKey(t, tmpDir, "pub.key", privKey)
 
-	// NOTE: Start of `1. vault ini`
-	iniContent := []byte(`[sectionExample]
-myKey=example
-
-[sectionExampleAgain]
-myOtherKey=exampleother
-`)
-	osExecutor := &os.RealOsExecutor{}
-
-	inputIniFilePath := path.Join(tmpDir, "input.ini")
-	err := osExecutor.WriteFile(inputIniFilePath, iniContent, 0644)
-	require.Nil(t, err)
-
-	iniTfFilePath := path.Join(tmpDir, "ini.tf")
-	stdout, stderr, err := build.Run(
-		"terraform",
-		"vault",
-		"ini",
-		"--public-key-path",
-		pubKeyPath,
-		"--in",
-		inputIniFilePath,
-		"--out",
-		iniTfFilePath,
-	)
-	require.Nil(t, err)
-	assert.Equal(t, "", stdout)
-	assert.Equal(t, "", stderr)
-
-	iniTfFileContent, err := osExecutor.ReadFile(iniTfFilePath)
-	require.Nil(t, err)
-
-	// NOTE: Make sure we actually wrote valid terraform resources
-	regexMatches := vaultedTestUtils.NewTerraformRegex.FindAllStringSubmatch(string(iniTfFileContent), -1)
-	assert.Equal(t, 2, len(regexMatches))
-
-	// NOTE: Start of `2. terraform vault migrate`
-	migratedTfFilePath := path.Join(tmpDir, "migrated.tf")
-	stdout, stderr, err = build.Run(
-		"terraform",
-		"vault",
-		"migrate",
-		"--private-key-path",
-		privKeyPath,
-		"--public-key-path",
-		pubKeyPath,
-		"--in",
-		iniTfFilePath,
-		"--out",
-		migratedTfFilePath,
-	)
-	require.Nil(t, err)
-	assert.Equal(t, "", stdout)
-	assert.Equal(t, "", stderr)
-
-	migratedTfFileContent, err := osExecutor.ReadFile(migratedTfFilePath)
-	require.Nil(t, err)
-
-	// NOTE: Make sure we actually wrote valid terraform resources
-	regexMatches = vaultedTestUtils.NewTerraformRegex.FindAllStringSubmatch(string(migratedTfFileContent), -1)
-	assert.Equal(t, 2, len(regexMatches))
-
 	// NOTE: Start of `4. terraform new-resource`
 	inFilePath := path.Join(tmpDir, "in.raw")
+	newResourceOutFilePath := path.Join(tmpDir, "out.tf")
 	inFileContent := []byte("mynewsecret")
 	newResourcePathArg := "secret/new-resource/example"
 	newResourceResourceName := "myresource"
 
-	err = osExecutor.WriteFile(inFilePath, inFileContent, 0644)
+	err := osExecutor.WriteFile(inFilePath, inFileContent, 0644)
 	require.Nil(t, err)
 
 	// NOTE: Append to the same output file as migrated one
-	stdout, stderr, err = build.Run(
+	stdout, stderr, err := build.Run(
 		"terraform",
 		"vault",
 		"new-resource",
@@ -445,18 +381,18 @@ myOtherKey=exampleother
 		"--in",
 		inFilePath,
 		"--out",
-		migratedTfFilePath,
+		newResourceOutFilePath,
 	)
 	require.Nil(t, err)
 	assert.Equal(t, "", stdout)
 	assert.Equal(t, "", stderr)
 
-	migratedTfFileContent, err = osExecutor.ReadFile(migratedTfFilePath)
+	tfFileContent, err := osExecutor.ReadFile(newResourceOutFilePath)
 	require.Nil(t, err)
 
 	// NOTE: Make sure we actually wrote valid terraform resources
-	regexMatches = vaultedTestUtils.NewTerraformRegex.FindAllStringSubmatch(string(migratedTfFileContent), -1)
-	assert.Equal(t, 3, len(regexMatches))
+	regexMatches := vaultedTestUtils.NewTerraformRegex.FindAllStringSubmatch(string(tfFileContent), -1)
+	assert.Equal(t, 1, len(regexMatches))
 
 	rotatedTfFilePath := path.Join(tmpDir, "rotated.tf")
 
@@ -470,7 +406,7 @@ myOtherKey=exampleother
 		"--private-key-path",
 		privKeyPath,
 		"--in",
-		migratedTfFilePath,
+		newResourceOutFilePath,
 		"--out",
 		rotatedTfFilePath,
 	)
@@ -483,7 +419,7 @@ myOtherKey=exampleother
 
 	// NOTE: Make sure we actually wrote valid terraform resources
 	regexMatches = vaultedTestUtils.NewTerraformRegex.FindAllStringSubmatch(string(rotatedTfFileContent), -1)
-	assert.Equal(t, 3, len(regexMatches))
+	assert.Equal(t, 1, len(regexMatches))
 
 	rekeyedTfFilePath := path.Join(tmpDir, "rekeyed.tf")
 
@@ -513,5 +449,5 @@ myOtherKey=exampleother
 
 	// NOTE: Make sure we actually wrote valid terraform resources
 	regexMatches = vaultedTestUtils.NewTerraformRegex.FindAllStringSubmatch(string(rekeyedTfFileContent), -1)
-	assert.Equal(t, 3, len(regexMatches))
+	assert.Equal(t, 1, len(regexMatches))
 }

@@ -16,15 +16,12 @@ package passphrase
 
 import (
 	stdRsa "crypto/rsa"
+	"hash"
 	"io"
 )
 
-type base64Service interface {
-	Serialize(raw []byte) ([]byte, error)
-	Deserialize(encoded []byte) ([]byte, error)
-}
-
 type rsaService interface {
+	EncryptOAEP(hash hash.Hash, random io.Reader, pub *stdRsa.PublicKey, msg []byte, label []byte) ([]byte, error)
 	EncryptPKCS1v15(rand io.Reader, pub *stdRsa.PublicKey, msg []byte) ([]byte, error)
 	DecryptPKCS1v15(rand io.Reader, priv *stdRsa.PrivateKey, ciphertext []byte) ([]byte, error)
 }

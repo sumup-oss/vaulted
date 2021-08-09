@@ -21,14 +21,7 @@ import (
 	"github.com/sumup-oss/vaulted/pkg/aes"
 	"github.com/sumup-oss/vaulted/pkg/base64"
 	"github.com/sumup-oss/vaulted/pkg/hcl"
-	"github.com/sumup-oss/vaulted/pkg/ini"
 	"github.com/sumup-oss/vaulted/pkg/rsa"
-	"github.com/sumup-oss/vaulted/pkg/terraform"
-	"github.com/sumup-oss/vaulted/pkg/terraform_encryption_migration"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 func NewRootCmd(
@@ -52,39 +45,13 @@ func NewRootCmd(
 		},
 	}
 
-	terraformSvc := terraform.NewTerraformService()
-	terraformEncryptionMigrationSvc := terraform_encryption_migration.NewTerraformEncryptionMigrationService(
-		terraformSvc,
-	)
-	headerSvc := header.NewHeaderService()
-	encPassphraseSvc := passphrase.NewEncryptedPassphraseService(base64Svc, rsaSvc)
-
-	legacyEncContentSvc := content.NewLegacyEncryptedContentService(base64Svc, aesSvc)
-	v1EncContentSvc := content.NewV1EncryptedContentService(base64Svc, aesSvc)
-
-	iniSvc := ini.NewIniService()
-	encPayloadSvc := payload.NewEncryptedPayloadService(
-		headerSvc,
-		encPassphraseSvc,
-		v1EncContentSvc,
-	)
-
 	cmdInstance.AddCommand(
 		NewVersionCmd(osExecutor),
-		NewEncryptCommand(osExecutor, rsaSvc, encPassphraseSvc, encPayloadSvc),
-		NewDecryptCommand(osExecutor),
-		NewRotateCommand(osExecutor, rsaSvc, encPassphraseSvc, encPayloadSvc),
-		NewRekeyCommand(osExecutor, rsaSvc, encPassphraseSvc, encPayloadSvc),
-		NewTerraformCmd(
-			osExecutor,
-			rsaSvc,
-			iniSvc,
-			encPassphraseSvc,
-			legacyEncContentSvc,
-			encPayloadSvc,
-			hclSvc,
-			terraformEncryptionMigrationSvc,
-		),
+		NewEncryptCommand(osExecutor, rsaSvc, base64Svc, aesSvc),
+		NewDecryptCommand(osExecutor, rsaSvc, base64Svc, aesSvc),
+		NewRotateCommand(osExecutor, rsaSvc, base64Svc, aesSvc),
+		NewRekeyCommand(osExecutor, rsaSvc, base64Svc, aesSvc),
+		NewTerraformCmd(osExecutor, rsaSvc, hclSvc, base64Svc, aesSvc),
 	)
 
 	return cmdInstance

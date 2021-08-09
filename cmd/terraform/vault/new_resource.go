@@ -28,14 +28,15 @@ import (
 	"github.com/sumup-oss/vaulted/pkg/vaulted"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 func NewNewResourceCommand(
 	osExecutor os.OsExecutor,
 	rsaSvc external_interfaces.RsaService,
-	encryptedPassphraseSvc external_interfaces.EncryptedPassphraseService,
-	encryptedPayloadSvc external_interfaces.EncryptedPayloadService,
+	b64Svc external_interfaces.Base64Service,
+	aesSvc external_interfaces.AesService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
 		Use: "new-resource --public-key-path ./my-pubkey.pem " +
@@ -81,9 +82,10 @@ func NewNewResourceCommand(
 				}
 			}
 
-			content := content.NewContent(inFileContent)
+			contentInstance := content.NewContent(inFileContent)
+			passphraseSvc := passphrase.NewService()
 
-			passphrase, err := encryptedPassphraseSvc.GeneratePassphrase(32)
+			generatedPassphrase, err := passphraseSvc.GeneratePassphrase(32)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -91,13 +93,17 @@ func NewNewResourceCommand(
 				)
 			}
 
-			payload := payload.NewPayload(
+			payloadInstance := payload.NewPayload(
 				header.NewHeader(),
-				passphrase,
-				content,
+				generatedPassphrase,
+				contentInstance,
 			)
 
-			encryptedPayload, err := encryptedPayloadSvc.Encrypt(pubKey, payload)
+			contentEncrypter := content.NewV1Service(b64Svc, aesSvc)
+			passphraseEncrypter := passphrase.NewEncryptionRsaPKCS1v15Service(rsaSvc, pubKey)
+			encryptionService := payload.NewEncryptionService(passphraseEncrypter, contentEncrypter)
+
+			encryptedPayload, err := encryptionService.Encrypt(payloadInstance)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -105,7 +111,9 @@ func NewNewResourceCommand(
 				)
 			}
 
-			serializedEncryptedPayload, err := encryptedPayloadSvc.Serialize(encryptedPayload)
+			payloadSerdeSvc := payload.NewSerdeService(b64Svc)
+
+			serializedEncryptedPayload, err := payloadSerdeSvc.Serialize(encryptedPayload)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -134,11 +142,12 @@ func NewNewResourceCommand(
 			hclFile := hclwrite.NewEmptyFile()
 			hclFile.Body().AppendBlock(block)
 
-			return cli.WriteHCLout(
+			err = cli.WriteHCLout(
 				osExecutor,
 				outFilePath,
 				hclFile,
 			)
+			return stacktrace.Propagate(err, "failed to write HCL to %s", outFilePath)
 		},
 	}
 

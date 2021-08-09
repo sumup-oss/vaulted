@@ -23,7 +23,7 @@ import (
 
 type Service struct{}
 
-func NewTerraformService() *Service {
+func NewService() *Service {
 	return &Service{}
 }
 

@@ -15,8 +15,8 @@
 package header
 
 const (
-	defaultName    = "$VED"
-	defaultVersion = "1.0"
+	DefaultName    = "$VED"
+	DefaultVersion = "1.0"
 )
 
 type Header struct {
@@ -26,7 +26,7 @@ type Header struct {
 
 func NewHeader() *Header {
 	return &Header{
-		Name:    defaultName,
-		Version: defaultVersion,
+		Name:    DefaultName,
+		Version: DefaultVersion,
 	}
 }

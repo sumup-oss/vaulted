@@ -25,12 +25,9 @@ import (
 func NewTerraformCmd(
 	osExecutor os.OsExecutor,
 	rsaSvc external_interfaces.RsaService,
-	iniSvc external_interfaces.IniService,
-	encryptedPassphraseSvc external_interfaces.EncryptedPassphraseService,
-	legacyEncryptedContentSvc external_interfaces.EncryptedContentService,
-	v1EncryptedPayloadSvc external_interfaces.EncryptedPayloadService,
 	hclSvc external_interfaces.HclService,
-	tfEncryptionMigrationSvc external_interfaces.TerraformEncryptionMigrationService,
+	b64Svc external_interfaces.Base64Service,
+	aesSvc external_interfaces.AesService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
 		Use:   "terraform",
@@ -45,12 +42,9 @@ func NewTerraformCmd(
 		terraformCmd.NewVaultCmd(
 			osExecutor,
 			rsaSvc,
-			iniSvc,
-			encryptedPassphraseSvc,
-			legacyEncryptedContentSvc,
-			v1EncryptedPayloadSvc,
 			hclSvc,
-			tfEncryptionMigrationSvc,
+			b64Svc,
+			aesSvc,
 		),
 	)
 
