@@ -12,13 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package ini
+package passphrase
 
-type Section struct {
-	Name   string
-	Values []*SectionValue
+import "github.com/palantir/stacktrace"
+
+type Service struct{}
+
+func NewService() *Service {
+	return &Service{}
 }
 
-func NewIniSection(name string) *Section {
-	return &Section{name, []*SectionValue{}}
+func (s *Service) GeneratePassphrase(length int) (*Passphrase, error) {
+	b := make([]byte, length)
+
+	_, err := randRead(b)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "failed to generate random sequence")
+	}
+
+	return newPassphrase(b), nil
 }

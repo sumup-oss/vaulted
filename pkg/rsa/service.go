@@ -20,6 +20,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 
 	"github.com/palantir/stacktrace"
@@ -75,7 +76,7 @@ func (s *Service) ReadPublicKeyFromBytes(publicKeyContent []byte) (*rsa.PublicKe
 	if err != nil {
 		return nil, stacktrace.Propagate(
 			err,
-			"unable to parse PKCS1 public key",
+			"unable to parse PKIX public key",
 		)
 	}
 
@@ -114,6 +115,10 @@ func (s *Service) ReadPrivateKeyFromBytes(privateKeyContent []byte) (*rsa.Privat
 	}
 
 	return key, nil
+}
+
+func (s *Service) EncryptOAEP(hash hash.Hash, random io.Reader, pub *rsa.PublicKey, msg []byte, label []byte) ([]byte, error) {
+	return rsaEncryptOAEP(hash, random, pub, msg, label)
 }
 
 func (s *Service) EncryptPKCS1v15(rand io.Reader, pub *rsa.PublicKey, msg []byte) ([]byte, error) {

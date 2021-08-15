@@ -15,27 +15,17 @@
 package terraform_encryption_migration
 
 import (
-	stdRsa "crypto/rsa"
-	"encoding/json"
-	"fmt"
-	"sort"
-	"strings"
-
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/palantir/stacktrace"
-	"github.com/zclconf/go-cty/cty"
 
 	"github.com/sumup-oss/vaulted/pkg/hcl"
-	"github.com/sumup-oss/vaulted/pkg/ini"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 const (
-	resourceType                     = "resource"
-	vaultEncryptedSecretResourceType = "vault_encrypted_secret"
+	resourceType = "resource"
 	// nolint:gosec
 	vaultedVaultSecretResourceType = "vaulted_vault_secret"
 )
@@ -50,32 +40,6 @@ func NewTerraformEncryptionMigrationService(terraformSvc terraformService) *Serv
 	}
 }
 
-// MigrateEncryptedTerraformResourceHcl parses and migrates a HCL terraform file
-// with `vault_encrypted_secret` terraform resources encrypted that were using `legacy encrypt` cmd.
-// It decrypts, encrypts and replaces existing terraform `vaulted`.
-// It does not lose/modify resources that are not `vault_encrypted_secret`.
-func (s *Service) MigrateEncryptedTerraformResourceHcl(
-	hclParser hcl.Parser,
-	hclBytes []byte,
-	privKey *stdRsa.PrivateKey,
-	pubKey *stdRsa.PublicKey,
-	legacyEncryptedContentSvc EncryptedContentService,
-	encryptedPassphraseSvc EncryptedPassphraseService,
-	encryptedPayloadSvc EncryptedPayloadService,
-) (*hclwrite.File, error) {
-	return s.terraformSvc.ModifyInPlaceHclAst(
-		hclParser,
-		hclBytes,
-		s.migrateEncryptedTerraformResourceHclObjectItemVisitor(
-			privKey,
-			pubKey,
-			legacyEncryptedContentSvc,
-			encryptedPassphraseSvc,
-			encryptedPayloadSvc,
-		),
-	)
-}
-
 // RotateOrRekeyEncryptedTerraformResourceHcl parses and rotates a HCL terraform file
 // with `vault_encrypted_secret` terraform resources encrypted that were using `encrypt` cmd.
 // It decrypts, encrypts and replaces existing terraform `vaulted`.
@@ -83,28 +47,28 @@ func (s *Service) MigrateEncryptedTerraformResourceHcl(
 func (s *Service) RotateOrRekeyEncryptedTerraformResourceHcl(
 	hclParser hcl.Parser,
 	hclBytes []byte,
-	privKey *stdRsa.PrivateKey,
-	pubKey *stdRsa.PublicKey,
-	encryptedPassphraseSvc EncryptedPassphraseService,
-	encryptedPayloadSvc EncryptedPayloadService,
+	passphraseSvc *passphrase.Service,
+	payloadSerdeSvc *payload.SerdeService,
+	oldPayloadDecrypter PayloadDecrypter,
+	newPayloadEncrypter PayloadEncrypter,
 ) (*hclwrite.File, error) {
 	return s.terraformSvc.ModifyInPlaceHclAst(
 		hclParser,
 		hclBytes,
 		s.rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
-			privKey,
-			pubKey,
-			encryptedPassphraseSvc,
-			encryptedPayloadSvc,
+			passphraseSvc,
+			payloadSerdeSvc,
+			oldPayloadDecrypter,
+			newPayloadEncrypter,
 		),
 	)
 }
 
 func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
-	privKey *stdRsa.PrivateKey,
-	pubKey *stdRsa.PublicKey,
-	encryptedPassphraseSvc EncryptedPassphraseService,
-	encryptedPayloadSvc EncryptedPayloadService,
+	passphraseSvc *passphrase.Service,
+	payloadSerdeSvc *payload.SerdeService,
+	oldPayloadDecrypter PayloadDecrypter,
+	newPayloadEncrypter PayloadEncrypter,
 ) func(block *hclwrite.Block) error {
 	return func(block *hclwrite.Block) error {
 		if block.Type() != resourceType {
@@ -142,7 +106,7 @@ func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
 			)
 		}
 
-		oldEncryptedPayload, err := encryptedPayloadSvc.Deserialize(previousEncPayload)
+		oldEncryptedPayload, err := payloadSerdeSvc.Deserialize(previousEncPayload)
 		if err != nil {
 			return stacktrace.NewError(
 				"failed to deserialize `payload_json` attr's value for `%s.%s`",
@@ -151,7 +115,7 @@ func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
 			)
 		}
 
-		oldPayload, err := encryptedPayloadSvc.Decrypt(privKey, oldEncryptedPayload)
+		oldPayload, err := oldPayloadDecrypter.Decrypt(oldEncryptedPayload)
 		if err != nil {
 			return stacktrace.NewError(
 				"failed to decrypt `payload_json` attr's value for `%s.%s`",
@@ -160,7 +124,7 @@ func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
 			)
 		}
 
-		newPassphrase, err := encryptedPassphraseSvc.GeneratePassphrase(32)
+		newPassphrase, err := passphraseSvc.GeneratePassphrase(32)
 		if err != nil {
 			return stacktrace.NewError(
 				"failed to generate new passphrase for `%s.%s`",
@@ -173,7 +137,7 @@ func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
 		// and encrypt the payload anew.
 		oldPayload.Passphrase = newPassphrase
 
-		newEncryptedPayload, err := encryptedPayloadSvc.Encrypt(pubKey, oldPayload)
+		newEncryptedPayload, err := newPayloadEncrypter.Encrypt(oldPayload)
 		if err != nil {
 			return stacktrace.NewError(
 				"failed to encrypt new encrypted payload for `%s.%s`",
@@ -182,7 +146,7 @@ func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
 			)
 		}
 
-		serializedNewEncPayload, err := encryptedPayloadSvc.Serialize(newEncryptedPayload)
+		serializedNewEncPayload, err := payloadSerdeSvc.Serialize(newEncryptedPayload)
 		if err != nil {
 			return stacktrace.NewError(
 				"failed to serialize new encrypted payload for `%s.%s`",
@@ -198,241 +162,6 @@ func (s *Service) rotateOrRekeyEncryptedTerraformResourceHclObjectItemVisitor(
 			labels[1],
 		)
 	}
-}
-
-func (s *Service) migrateEncryptedTerraformResourceHclObjectItemVisitor(
-	privKey *stdRsa.PrivateKey,
-	pubKey *stdRsa.PublicKey,
-	legacyEncryptedContentSvc EncryptedContentService,
-	encryptedPassphraseSvc EncryptedPassphraseService,
-	encryptedPayloadSvc EncryptedPayloadService,
-) func(block *hclwrite.Block) error {
-	return func(block *hclwrite.Block) error {
-		if block.Type() != resourceType {
-			return nil
-		}
-
-		// NOTE: We're only interested in
-		//  "resource_type" "resource_name"`
-		labels := block.Labels()
-		if len(labels) != 2 {
-			return nil
-		}
-
-		if labels[0] != vaultEncryptedSecretResourceType {
-			return nil
-		}
-
-		oldEncryptedDataJSON, _, _, err := s.readHclQuoteLitAttr(block, "encrypted_data_json")
-		if err != nil {
-			return stacktrace.NewError(
-				"failed to read `encrypted_data_json` attr value for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		if len(oldEncryptedDataJSON) == 0 {
-			return stacktrace.NewError(
-				"empty `encrypted_data_json` attr value for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		oldEncryptedPassphrase, _, _, err := s.readHclQuoteLitAttr(block, "encrypted_passphrase")
-		if err != nil {
-			return stacktrace.NewError(
-				"failed to read `encrypted_passphrase` attr value for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		if len(oldEncryptedPassphrase) == 0 {
-			return stacktrace.NewError(
-				"empty `encrypted_passphrase` attr value for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		legacyEncryptedPassphrase, err := encryptedPassphraseSvc.Deserialize(oldEncryptedPassphrase)
-		if err != nil {
-			return stacktrace.NewError(
-				"failed to deserialize `encrypted_passphrase` attr value for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		legacyPassphrase, err := encryptedPassphraseSvc.Decrypt(privKey, legacyEncryptedPassphrase)
-		if err != nil {
-			return stacktrace.NewError(
-				"failed to decrypt `encrypted_passphrase` attr value for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		legacyEncryptedContent, err := legacyEncryptedContentSvc.Deserialize(oldEncryptedDataJSON)
-		if err != nil {
-			return stacktrace.NewError(
-				"failed to deserialize `encrypted_data_json` attr value for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		content, err := legacyEncryptedContentSvc.Decrypt(legacyPassphrase, legacyEncryptedContent)
-		if err != nil {
-			return stacktrace.NewError(
-				"failed to decrypt `encrypted_data_json` attr value for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		newPassphrase, err := encryptedPassphraseSvc.GeneratePassphrase(32)
-		if err != nil {
-			return stacktrace.NewError(
-				"failed to generate new encrypted passphrase for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		payload := payload.NewPayload(
-			header.NewHeader(),
-			newPassphrase,
-			content,
-		)
-
-		encryptedPayload, err := encryptedPayloadSvc.Encrypt(pubKey, payload)
-		if err != nil {
-			return stacktrace.NewError(
-				"failed to encrypt new encrypted payload for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		serializedEncryptedPayload, err := encryptedPayloadSvc.Serialize(encryptedPayload)
-		if err != nil {
-			return stacktrace.NewError(
-				"failed to serialize new encrypted payload for `%s.%s`",
-				vaultEncryptedSecretResourceType,
-				labels[1],
-			)
-		}
-
-		blockBody := block.Body()
-		labels[0] = "vaulted_vault_secret"
-		block.SetLabels(labels)
-
-		// NOTE: Adapt to resource `vaulted_vault_secret` format.
-		blockBody.RemoveAttribute("encrypted_data_json")
-		blockBody.RemoveAttribute("encrypted_passphrase")
-		blockBody.SetAttributeValue("encrypted_payload", cty.StringVal(string(serializedEncryptedPayload)))
-
-		return nil
-	}
-}
-
-func (s *Service) ConvertIniContentToV1ResourceHCL(
-	passphraseLength int,
-	iniContent *ini.Content,
-	pubKey *stdRsa.PublicKey,
-	encryptedPassphraseSvc EncryptedPassphraseService,
-	encryptedPayloadSvc EncryptedPayloadService,
-) (*hclwrite.File, error) {
-	hclFile := hclwrite.NewEmptyFile()
-
-	blocksByResourceName := make(map[string]*hclwrite.Block)
-	sortedResourceNames := make([]string, 0)
-
-	for name, section := range iniContent.SectionsByName {
-		for _, sectionValue := range section.Values {
-			iniPath := fmt.Sprintf("%s/%s", name, sectionValue.KeyName)
-			resourceName := strings.ReplaceAll(iniPath, "/", "_")
-
-			block := hclwrite.NewBlock(
-				"resource",
-				[]string{
-					"vaulted_vault_secret",
-					fmt.Sprintf(
-						"vaulted_vault_secret_%s",
-						resourceName,
-					),
-				},
-			)
-			valueMap := map[string]interface{}{
-				"value": sectionValue.Value,
-			}
-
-			dataJSON, err := json.Marshal(valueMap)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to marshal in JSON value for section: %s, key: %s",
-					name,
-					sectionValue.KeyName,
-				)
-			}
-
-			passphrase, err := encryptedPassphraseSvc.GeneratePassphrase(passphraseLength)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to generate random passphrase",
-				)
-			}
-
-			payloadInstance := payload.NewPayload(
-				header.NewHeader(),
-				passphrase,
-				content.NewContent(dataJSON),
-			)
-
-			encPayload, err := encryptedPayloadSvc.Encrypt(pubKey, payloadInstance)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to encrypt content from section: %s, key: %s",
-					name,
-					sectionValue.KeyName,
-				)
-			}
-
-			serializedEncPayload, err := encryptedPayloadSvc.Serialize(encPayload)
-			if err != nil {
-				return nil, stacktrace.Propagate(
-					err,
-					"failed to serialize encrypted payload",
-				)
-			}
-
-			path := fmt.Sprintf("secret/%s", iniPath)
-
-			blockBody := block.Body()
-			blockBody.SetAttributeValue("path", cty.StringVal(path))
-			blockBody.SetAttributeValue("payload_json", cty.StringVal(string(serializedEncPayload)))
-
-			blocksByResourceName[resourceName] = block
-
-			sortedResourceNames = append(sortedResourceNames, resourceName)
-		}
-	}
-
-	// NOTE: Always add the resources alphabetically for consistency.
-	sort.Strings(sortedResourceNames)
-
-	for _, resourceName := range sortedResourceNames {
-		block := blocksByResourceName[resourceName]
-		hclFile.Body().AppendBlock(block)
-	}
-
-	return hclFile, nil
 }
 
 func (s *Service) readHclQuoteLitAttr(block *hclwrite.Block, name string) ([]byte, int, int, error) {

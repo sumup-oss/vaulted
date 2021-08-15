@@ -1,6 +1,9 @@
 module github.com/sumup-oss/vaulted
 
 require (
+	github.com/aws/aws-sdk-go-v2 v1.8.0 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.6.0
+	github.com/aws/aws-sdk-go-v2/service/kms v1.4.2
 	github.com/go-ini/ini v1.62.0
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/hcl/v2 v2.10.1
@@ -14,4 +17,4 @@ require (
 	gopkg.in/ini.v1 v1.42.0 // indirect
 )
 
-go 1.14
+go 1.16

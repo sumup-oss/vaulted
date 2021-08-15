@@ -92,18 +92,21 @@ linters:
     - nlreturn
     # NOTE: False-positives
     - nestif
+    # NOTE: Doesn't play nice with `stacktrace` pkg
+    - wrapcheck
+    # NOTE: More opinionated than useful
+    - revive
+    # NOTE: Very bad practice in terms of readability and code consistency.
+    # Questionable benefit of saving 1 line of code.
+    - ifshort
 issues:
   exclude-rules:
-    - text: "don't use an underscore in package name"
-      linters:
-        - revive
     - text: "weak cryptographic primitive"
       linters:
         - gosec
-    # NOTE: Ignore duplicate false positives
-    - path: pkg/vaulted/content/legacy_encrypted_content_service.go
+    - text: "appendAssign: append result not assigned to the same slice"
       linters:
-        - dupl
+        - gocritic
     - path: pkg/vaulted/content/v1_encrypted_content_service.go
       linters:
         - dupl
@@ -111,12 +114,6 @@ issues:
       linters:
         - dupl
     - path: cmd/terraform/vault/rekey.go
-      linters:
-        - dupl
-    - path: cmd/terraform/vault/ini.go
-      linters:
-        - dupl
-    - path: cmd/legacy/vault/ini.go
       linters:
         - dupl
     - path: _test\.go

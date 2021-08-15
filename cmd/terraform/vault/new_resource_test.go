@@ -23,10 +23,6 @@ import (
 	"github.com/sumup-oss/vaulted/pkg/base64"
 	"github.com/sumup-oss/vaulted/pkg/pkcs7"
 	"github.com/sumup-oss/vaulted/pkg/rsa"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 func TestNewNewResourceCmd(t *testing.T) {
@@ -36,15 +32,8 @@ func TestNewNewResourceCmd(t *testing.T) {
 	b64Svc := base64.NewBase64Service()
 	rsaSvc := rsa.NewRsaService(osExecutor)
 	aesSvc := aes.NewAesService(pkcs7.NewPkcs7Service())
-	encPassphraseSvc := passphrase.NewEncryptedPassphraseService(b64Svc, rsaSvc)
-	encContentSvc := content.NewV1EncryptedContentService(b64Svc, aesSvc)
-	encPayloadSvc := payload.NewEncryptedPayloadService(
-		header.NewHeaderService(),
-		encPassphraseSvc,
-		encContentSvc,
-	)
 
-	actual := NewNewResourceCommand(osExecutor, rsaSvc, encPassphraseSvc, encPayloadSvc)
+	actual := NewNewResourceCommand(osExecutor, rsaSvc, b64Svc, aesSvc)
 
 	assert.Equal(
 		t,

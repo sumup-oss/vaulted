@@ -55,18 +55,23 @@ Change line format:
 
 ### Changed
 
-* Replaced HCLv1 parser with HCLv2 one ; Ref: https://github.com/sumup-oss/vaulted/pull/16
-
-### Removed
-
-* Commands from `legacy` sub-command are now removed. We're not using them internally. The migration from legacy to v1 secret format command(s) are there to help you transition ; Ref: https://github.com/sumup-oss/vaulted/pull/15
-* HCLv1 parsing and support for Terraform earlier than 0.12 ; Ref: https://github.com/sumup-oss/vaulted/pull/16
-
 ## v0.3.0
+
+### Added
+
+* AWS KMS asymmetric keypair encryption & decryption support ; Ref: https://github.com/sumup-oss/vaulted/pull/33
 
 ### Changed
 
 * Commands from `terraform` sub-command are now part of `terraform vault`. This is to accommodate for future `terraform X` command where X might be another provider ; Ref: https://github.com/sumup-oss/vaulted/pull/5
+* Replaced HCLv1 parser with HCLv2 one ; Ref: https://github.com/sumup-oss/vaulted/pull/16
+* Untangled the API implemented by other users of vaulted like terraform providers. Result is now it's easier to implement different strategies, like in the future - GCP KMS support. ; Ref: https://github.com/sumup-oss/vaulted/pull/33
+ 
+### Removed
+
+* Commands from `legacy` sub-command are now removed. We're not using them internally. The migration from legacy to v1 secret format command(s) are there to help you transition ; Ref: https://github.com/sumup-oss/vaulted/pull/15
+* HCLv1 parsing and support for Terraform earlier than 0.12 ; Ref: https://github.com/sumup-oss/vaulted/pull/16
+* `ini` commands. Ref: https://github.com/sumup-oss/vaulted/pull/33
 
 ## v0.2.1
 

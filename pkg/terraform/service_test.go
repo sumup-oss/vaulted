@@ -26,7 +26,7 @@ func TestNewTerraformService(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			actual := NewTerraformService()
+			actual := NewService()
 
 			assert.IsType(t, actual, &Service{})
 		},

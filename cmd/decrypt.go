@@ -15,47 +15,85 @@
 package cmd
 
 import (
+	"context"
+	stdRsa "crypto/rsa"
 	"fmt"
 
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cobra"
 	"github.com/sumup-oss/go-pkgs/os"
 
+	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
 	"github.com/sumup-oss/vaulted/internal/cli"
-	"github.com/sumup-oss/vaulted/pkg/aes"
-	"github.com/sumup-oss/vaulted/pkg/base64"
-	"github.com/sumup-oss/vaulted/pkg/pkcs7"
-	"github.com/sumup-oss/vaulted/pkg/rsa"
+	"github.com/sumup-oss/vaulted/pkg/aws"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
-	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
+// nolint:lll
+const decryptExample = `
+  # Decryption using local RSA asymmetric keypair. This requires the "--in" to have been encrypted using local RSA public key.
+  > vaulted decrypt --private-key-path ./my-pubkey.pem --in ./mysecret-enc.base64 --out ./mysecret.txt 
+
+  # Decryption using AWS KMS asymmetric keypair. This requires the "--in" to have been encrypted using local AWS KMS asymmetric public key.
+  # Make sure to set the correct AWS_REGION and AWS_PROFILE where the AWS KMS key is present.
+  > AWS_REGION=eu-west-1 AWS_PROFILE=secretprofile vaulted decrypt --aws-kms-id=alias/yourkey  --in ./mysecret-enc.base64 --out ./mysecret.txt 
+`
+
 func NewDecryptCommand(
 	osExecutor os.OsExecutor,
+	rsaSvc external_interfaces.RsaService,
+	b64Svc external_interfaces.Base64Service,
+	aesSvc external_interfaces.AesService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
 		Use:   "decrypt --private-key-path ./private.pem --in ./mysecret-enc.base64 --out ./mysecret.txt",
 		Short: "Decrypt a file/value",
 		Long: "Decrypt a file/value using AES-256GCM symmetric encryption. " +
 			"Passphrase is encrypted with RSA asymmetric keypair.",
+		Example: decryptExample,
 		RunE: func(cmdInstance *cobra.Command, args []string) error {
 			privateKeyPath := cmdInstance.Flag("private-key-path").Value.String()
+			awsKmsKeyID := cmdInstance.Flag("aws-kms-key-id").Value.String()
+			awsRegion := cmdInstance.Flag("aws-region").Value.String()
 
-			rsaSvc := rsa.NewRsaService(osExecutor)
-			// NOTE: Read early to avoid needless decryption
-			privKey, err := rsaSvc.ReadPrivateKeyFromPath(privateKeyPath)
-			if err != nil {
-				return stacktrace.Propagate(
-					err,
-					"failed to read specified private key",
+			var privKey *stdRsa.PrivateKey
+			var err error
+
+			var decryptionService *payload.DecryptionService
+			contentDecrypter := content.NewV1Service(b64Svc, aesSvc)
+
+			if privateKeyPath != "" {
+				privKey, err = rsaSvc.ReadPrivateKeyFromPath(privateKeyPath)
+				if err != nil {
+					return stacktrace.Propagate(
+						err,
+						"failed to read specified private key",
+					)
+				}
+
+				decryptionService = payload.NewDecryptionService(
+					passphrase.NewDecryptionRsaPKCS1v15Service(privKey, rsaSvc),
+					contentDecrypter,
+				)
+			} else if awsKmsKeyID != "" {
+				var awsSvc *aws.Service
+				awsSvc, err = aws.NewService(context.Background(), awsRegion)
+				if err != nil {
+					return stacktrace.Propagate(err, "failed to create aws service")
+				}
+
+				decryptionService = payload.NewDecryptionService(
+					passphrase.NewDecryptionAwsKmsService(awsSvc, awsKmsKeyID),
+					contentDecrypter,
 				)
 			}
 
-			inFilePathArg := cmdInstance.Flag("in").Value.String()
-
 			var serializedEncryptedPayload []byte
+
+			// NOTE: Read early to avoid needless decryption
+			inFilePathArg := cmdInstance.Flag("in").Value.String()
 			if inFilePathArg == "" {
 				serializedEncryptedPayload, err = cli.ReadFromStdin(
 					osExecutor,
@@ -77,27 +115,9 @@ func NewDecryptCommand(
 				}
 			}
 
-			base64Svc := base64.NewBase64Service()
-			pkcs7Svc := pkcs7.NewPkcs7Service()
-			aesSvc := aes.NewAesService(pkcs7Svc)
+			payloadSerdeSvc := payload.NewSerdeService(b64Svc)
 
-			encryptedPassphraseSvc := passphrase.NewEncryptedPassphraseService(
-				base64Svc,
-				rsaSvc,
-			)
-
-			encryptedContentSvc := content.NewV1EncryptedContentService(
-				base64Svc,
-				aesSvc,
-			)
-
-			encryptedPayloadSvc := payload.NewEncryptedPayloadService(
-				header.NewHeaderService(),
-				encryptedPassphraseSvc,
-				encryptedContentSvc,
-			)
-
-			encryptedPayload, err := encryptedPayloadSvc.Deserialize(serializedEncryptedPayload)
+			encryptedPayload, err := payloadSerdeSvc.Deserialize(serializedEncryptedPayload)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -105,7 +125,7 @@ func NewDecryptCommand(
 				)
 			}
 
-			payload, err := encryptedPayloadSvc.Decrypt(privKey, encryptedPayload)
+			payloadInstance, err := decryptionService.Decrypt(encryptedPayload)
 			if err != nil {
 				return stacktrace.Propagate(
 					err,
@@ -115,25 +135,23 @@ func NewDecryptCommand(
 
 			outFilePath := cmdInstance.Flag("out").Value.String()
 			if outFilePath == "" {
-				fmt.Fprintln(osExecutor.Stdout(), "Decrypted payload below:")
+				_, _ = fmt.Fprintln(osExecutor.Stdout(), "Decrypted payload below:")
 
 				// NOTE: Explicitly print as string representation
-				fmt.Fprintln(osExecutor.Stdout(), string(payload.Content.Plaintext))
-			} else {
-				err := osExecutor.WriteFile(
-					outFilePath,
-					payload.Content.Plaintext,
-					0644,
-				)
-				if err != nil {
-					return stacktrace.Propagate(
-						err,
-						"failed to write decrypted payload",
-					)
-				}
+				_, _ = fmt.Fprintln(osExecutor.Stdout(), string(payloadInstance.Content.Plaintext))
+
+				return nil
 			}
 
-			return nil
+			err = osExecutor.WriteFile(
+				outFilePath,
+				payloadInstance.Content.Plaintext,
+				0644,
+			)
+			return stacktrace.Propagate(
+				err,
+				"failed to write decrypted payload",
+			)
 		},
 	}
 
@@ -142,8 +160,18 @@ func NewDecryptCommand(
 		"",
 		"Path to RSA private key used to decrypt encrypted payload.",
 	)
-	//nolint:errcheck
-	cmdInstance.MarkPersistentFlagRequired("private-key-path")
+
+	cmdInstance.PersistentFlags().String(
+		"aws-kms-key-id",
+		"",
+		"AWS Asymmetric Customer Managed Key ID",
+	)
+
+	cmdInstance.PersistentFlags().String(
+		"aws-region",
+		"",
+		"AWS Region to use for KMS. Can also be provided by `AWS_REGION` environment variable.",
+	)
 
 	cmdInstance.PersistentFlags().String(
 		"in",

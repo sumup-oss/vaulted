@@ -27,8 +27,8 @@ const (
 )
 
 var (
-	headerAllowedNames    = []string{defaultName}
-	headerAllowedVersions = []string{defaultVersion}
+	headerAllowedNames    = []string{DefaultName}
+	headerAllowedVersions = []string{DefaultVersion}
 
 	errHeadersPartsMismatch = errors.New("did not find exactly 2 header parts")
 	errHeaderNameInvalid    = fmt.Errorf(

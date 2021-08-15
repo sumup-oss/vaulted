@@ -16,6 +16,7 @@ package test
 
 import (
 	stdRsa "crypto/rsa"
+	"hash"
 	"io"
 
 	"github.com/stretchr/testify/mock"
@@ -64,6 +65,19 @@ func (m *MockRsaService) EncryptPKCS1v15(rand io.Reader, pub *stdRsa.PublicKey, 
 
 func (m *MockRsaService) DecryptPKCS1v15(rand io.Reader, priv *stdRsa.PrivateKey, ciphertext []byte) ([]byte, error) {
 	args := m.Called(rand, priv, ciphertext)
+
+	returnValue := args.Get(0)
+
+	// NOTE: Workaround lack of get bytes without type-assertion method.
+	if returnValue == nil {
+		return nil, args.Error(1)
+	}
+
+	return returnValue.([]byte), args.Error(1)
+}
+
+func (m *MockRsaService) EncryptOAEP(hash hash.Hash, rand io.Reader, pub *stdRsa.PublicKey, msg []byte, label []byte) ([]byte, error) {
+	args := m.Called(hash, rand, pub, msg)
 
 	returnValue := args.Get(0)
 

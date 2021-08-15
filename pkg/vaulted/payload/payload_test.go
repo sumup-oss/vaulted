@@ -19,9 +19,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/sumup-oss/go-pkgs/os/ostest"
-	"github.com/sumup-oss/vaulted/pkg/base64"
-	"github.com/sumup-oss/vaulted/pkg/rsa"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/header"
 	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
@@ -33,14 +30,7 @@ func TestNewPayload(t *testing.T) {
 		func(t *testing.T) {
 			headerArg := header.NewHeader()
 
-			encPassphraseSvc := passphrase.NewEncryptedPassphraseService(
-				base64.NewBase64Service(),
-				rsa.NewRsaService(
-					ostest.NewFakeOsExecutor(t),
-				),
-			)
-
-			passphraseArg, err := encPassphraseSvc.GeneratePassphrase(16)
+			passphraseArg, err := passphrase.NewService().GeneratePassphrase(16)
 			contentArg := content.NewContent([]byte("12345678"))
 
 			actual := NewPayload(headerArg, passphraseArg, contentArg)

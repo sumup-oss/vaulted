@@ -21,15 +21,19 @@ import (
 
 	"github.com/sumup-oss/vaulted/cmd/external_interfaces"
 	"github.com/sumup-oss/vaulted/internal/cli"
+	"github.com/sumup-oss/vaulted/pkg/terraform"
+	"github.com/sumup-oss/vaulted/pkg/terraform_encryption_migration"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/content"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/passphrase"
+	"github.com/sumup-oss/vaulted/pkg/vaulted/payload"
 )
 
 func NewRotateCommand(
 	osExecutor os.OsExecutor,
 	rsaSvc external_interfaces.RsaService,
-	encryptedPassphraseSvc external_interfaces.EncryptedPassphraseService,
-	v1EncryptedPayloadSvc external_interfaces.EncryptedPayloadService,
 	hclSvc external_interfaces.HclService,
-	tfEncryptionMigrationSvc external_interfaces.TerraformEncryptionMigrationService,
+	b64Svc external_interfaces.Base64Service,
+	aesSvc external_interfaces.AesService,
 ) *cobra.Command {
 	cmdInstance := &cobra.Command{
 		Use: "rotate " +
@@ -41,7 +45,7 @@ func NewRotateCommand(
 		Long: "Rotate (decrypt and encrypt) existing terraform resources using AES256-GCM encryption. " +
 			"Public key must originate from same private key, otherwise you probably want" +
 			"to use `rekey` instead. " +
-			"Passfile runtime random generated and encrypted with RSA asymmetric keypair.",
+			"Passphrase is runtime randomly generated and encrypted with RSA asymmetric keypair.",
 		RunE: func(cmdInstance *cobra.Command, args []string) error {
 			publicKeyPath := cmdInstance.Flag("public-key-path").Value.String()
 
@@ -97,13 +101,24 @@ func NewRotateCommand(
 				}
 			}
 
+			tfSvc := terraform.NewService()
+			payloadSerdeSvc := payload.NewSerdeService(b64Svc)
+			contentV1Svc := content.NewV1Service(b64Svc, aesSvc)
+			oldPassphraseDecrypter := passphrase.NewDecryptionRsaPKCS1v15Service(privKey, rsaSvc)
+			oldPayloadDecrypter := payload.NewDecryptionService(oldPassphraseDecrypter, contentV1Svc)
+
+			passphraseSvc := passphrase.NewService()
+			passphraseEncrypter := passphrase.NewEncryptionRsaPKCS1v15Service(rsaSvc, pubKey)
+			payloadEncrypter := payload.NewEncryptionService(passphraseEncrypter, contentV1Svc)
+
+			tfEncryptionMigrationSvc := terraform_encryption_migration.NewTerraformEncryptionMigrationService(tfSvc)
 			hclFile, err := tfEncryptionMigrationSvc.RotateOrRekeyEncryptedTerraformResourceHcl(
 				hclSvc,
 				inFileContent,
-				privKey,
-				pubKey,
-				encryptedPassphraseSvc,
-				v1EncryptedPayloadSvc,
+				passphraseSvc,
+				payloadSerdeSvc,
+				oldPayloadDecrypter,
+				payloadEncrypter,
 			)
 			if err != nil {
 				return stacktrace.Propagate(

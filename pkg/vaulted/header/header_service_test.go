@@ -27,12 +27,12 @@ func TestHeaderServiceConstants(t *testing.T) {
 
 	assert.Equal(t, headerPartSeparator, ";")
 
-	expectedAllowedNames := []string{defaultName}
+	expectedAllowedNames := []string{DefaultName}
 
 	assert.Equal(t, len(expectedAllowedNames), len(headerAllowedNames))
 	assert.Equal(t, expectedAllowedNames[0], headerAllowedNames[0])
 
-	expectedAllowedVersions := []string{defaultVersion}
+	expectedAllowedVersions := []string{DefaultVersion}
 
 	assert.Equal(t, len(expectedAllowedVersions), len(headerAllowedVersions))
 	assert.Equal(t, expectedAllowedVersions[0], headerAllowedVersions[0])
@@ -76,7 +76,7 @@ func TestHeaderService_Serialize(t *testing.T) {
 
 			headerArg := &Header{
 				Name:    "",
-				Version: defaultVersion,
+				Version: DefaultVersion,
 			}
 
 			headerSvc := NewHeaderService()
@@ -95,7 +95,7 @@ func TestHeaderService_Serialize(t *testing.T) {
 			t.Parallel()
 
 			headerArg := &Header{
-				Name:    defaultName,
+				Name:    DefaultName,
 				Version: "",
 			}
 
@@ -159,7 +159,7 @@ func TestHeaderService_Deserialize(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			contentArg := defaultName
+			contentArg := DefaultName
 
 			headerService := NewHeaderService()
 
@@ -176,7 +176,7 @@ func TestHeaderService_Deserialize(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			contentArg := fmt.Sprintf("%s%s%s", "BAD", headerPartSeparator, defaultVersion)
+			contentArg := fmt.Sprintf("%s%s%s", "BAD", headerPartSeparator, DefaultVersion)
 
 			headerService := &HeaderService{}
 
@@ -193,7 +193,7 @@ func TestHeaderService_Deserialize(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			contentArg := fmt.Sprintf("%s%s%s", defaultName, headerPartSeparator, "BAD")
+			contentArg := fmt.Sprintf("%s%s%s", DefaultName, headerPartSeparator, "BAD")
 
 			headerService := &HeaderService{}
 
@@ -210,7 +210,7 @@ func TestHeaderService_Deserialize(t *testing.T) {
 		func(t *testing.T) {
 			t.Parallel()
 
-			contentArg := fmt.Sprintf("%s%s%s", defaultName, headerPartSeparator, defaultVersion)
+			contentArg := fmt.Sprintf("%s%s%s", DefaultName, headerPartSeparator, DefaultVersion)
 
 			headerService := &HeaderService{}
 
@@ -219,8 +219,8 @@ func TestHeaderService_Deserialize(t *testing.T) {
 			require.NotNil(t, header)
 			require.Nil(t, err)
 
-			assert.Equal(t, header.Name, defaultName)
-			assert.Equal(t, header.Version, defaultVersion)
+			assert.Equal(t, header.Name, DefaultName)
+			assert.Equal(t, header.Version, DefaultVersion)
 		},
 	)
 }
