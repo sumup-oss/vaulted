@@ -38,7 +38,7 @@ const decryptExample = `
 
   # Decryption using AWS KMS asymmetric keypair. This requires the "--in" to have been encrypted using local AWS KMS asymmetric public key.
   # Make sure to set the correct AWS_REGION and AWS_PROFILE where the AWS KMS key is present.
-  > AWS_REGION=eu-west-1 AWS_PROFILE=secretprofile vaulted decrypt --aws-kms-id=alias/yourkey  --in ./mysecret-enc.base64 --out ./mysecret.txt 
+  > AWS_REGION=eu-west-1 AWS_PROFILE=secretprofile vaulted decrypt --aws-kms-key-id=alias/yourkey  --in ./mysecret-enc.base64 --out ./mysecret.txt 
 `
 
 func NewDecryptCommand(
