@@ -55,6 +55,8 @@ Change line format:
 
 ### Changed
 
+* Fix AWS interface extensibility ; Ref: https://github.com/sumup-oss/vaulted/pull/34
+
 ## v0.3.0
 
 ### Added

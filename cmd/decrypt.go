@@ -19,6 +19,7 @@ import (
 	stdRsa "crypto/rsa"
 	"fmt"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cobra"
 	"github.com/sumup-oss/go-pkgs/os"
@@ -79,9 +80,15 @@ func NewDecryptCommand(
 				)
 			} else if awsKmsKeyID != "" {
 				var awsSvc *aws.Service
-				awsSvc, err = aws.NewService(context.Background(), awsRegion)
-				if err != nil {
-					return stacktrace.Propagate(err, "failed to create aws service")
+
+				awsCfg, awsErr := awsconfig.LoadDefaultConfig(context.Background(), awsconfig.WithRegion(awsRegion))
+				if awsErr != nil {
+					return stacktrace.Propagate(awsErr, "failed to load AWS config from environment")
+				}
+
+				awsSvc, awsErr = aws.NewService(&awsCfg)
+				if awsErr != nil {
+					return stacktrace.Propagate(awsErr, "failed to create aws service")
 				}
 
 				decryptionService = payload.NewDecryptionService(

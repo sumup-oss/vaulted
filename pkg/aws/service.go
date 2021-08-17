@@ -18,7 +18,6 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/palantir/stacktrace"
 )
@@ -27,17 +26,8 @@ type Service struct {
 	cfg *aws.Config
 }
 
-func NewService(ctx context.Context, region string) (*Service, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(ctx)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "failed to load default AWS config")
-	}
-
-	if region != "" {
-		cfg.Region = region
-	}
-
-	return &Service{cfg: &cfg}, nil
+func NewService(cfg *aws.Config) (*Service, error) {
+	return &Service{cfg: cfg}, nil
 }
 
 func (s *Service) Decrypt(ctx context.Context, kmsKeyID string, ciphertext []byte) ([]byte, error) {
