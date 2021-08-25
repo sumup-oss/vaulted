@@ -59,7 +59,7 @@ Change line format:
 
 ### Removed
 
-* Fix depending on k8s golang packages when you're not needed. ; Ref: 
+* Fix depending on k8s golang packages when you're not needed. ; Ref: 5b019e1b1659d11f167a5738c525fb39ef2537f7
 
 ## v0.3.0
 
