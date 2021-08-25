@@ -57,6 +57,10 @@ Change line format:
 
 * Fix AWS interface extensibility ; Ref: https://github.com/sumup-oss/vaulted/pull/34
 
+### Removed
+
+* Fix depending on k8s golang packages when you're not needed. ; Ref: 
+
 ## v0.3.0
 
 ### Added
