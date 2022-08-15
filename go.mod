@@ -1,8 +1,8 @@
 module github.com/sumup-oss/vaulted
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.8.0
-	github.com/aws/aws-sdk-go-v2/config v1.6.0
+	github.com/aws/aws-sdk-go-v2 v1.16.11
+	github.com/aws/aws-sdk-go-v2/config v1.17.0
 	github.com/aws/aws-sdk-go-v2/service/kms v1.4.2
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/hcl/v2 v2.10.1
