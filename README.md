@@ -89,7 +89,7 @@ Example **unusable** with `vaulted` `PKCS#8`-formatted private key
 
 Obvious different is in the PEM block names.
 
-However in terms of content, `PKCS#8` PEM contains the `version` and `algorithm` identifiers and 
+However, in terms of content, `PKCS#8` PEM contains the `version` and `algorithm` identifiers and 
  `private key` content.
 
 The `PKCS#1` PEM contains just the `private key` content. 
@@ -97,6 +97,24 @@ The `PKCS#1` PEM contains just the `private key` content.
 ## Usage
 
 Check out [COMMANDS](./COMMANDS.md)
+
+## Data format structure
+
+When you use `vaulted`, you're going to see that it generates unique "strings" in a certain format.
+The format is:
+
+* Reserved `$VED` signature
+* Data format version, e.g `1.0`
+* Separator `::`
+* Randomly generated and base64-encoded AES256 cipher passphrase encrypted via user-provided RSA public key
+* Separator `::`
+* User-provided base64-encoded secret payload encrypted via the previously randomly generated AES256 cipher passphrase
+
+E.g payload
+
+```
+$VED;1.0::lobnjrnSDJZBzWeaETjbxc0Gqs3cm6BlIkgCebGBtTYJSchZRMoJlXjH79ladMuBxkjvRbk/Hul5ZjC+gKGjLW1wm+1n+KmZQGjeq418zq1uZ5S6GGLGC/x9tc1CYV2n6dljTV77kSDaL94/My6sHp+HKeHP6LM/uGg0ixRMqv8gW/uC27wnjuONzad9I/EfUmyoDxd7sIi3nr/UnLelsgDJ4cCMlABAmEdXf+TyrpLfSQ7t7DACTpzB3WIomlNM4jSmcvhbVHfvmsOZgzIxK38LyvNAsLNAHZx/e0NcEE8jxBei3r8MHZZ9JSms1KlHzRbR7Yh8+giYx4ArpmS/vw==::m8mqNQMIfNpdWjj3zjCe/aoNCwfpCUbJ/3Dt4ulcLyRFOZR8dA==
+```
 
 ## Contributing
 
