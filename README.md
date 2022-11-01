@@ -46,7 +46,9 @@ Combined with https://github.com/sumup-oss/terraform-provider-vaulted, it's show
 
 ```shell
 # Generate PKCS#1 private key
-> openssl genrsa -f4 -out private.pem 4096
+# NOTE: `-traditional` is needed for new versions of OpenSSL. For older versions you can omit it. 
+# It's needed to generate PKCS#1 private key.
+> openssl genrsa -traditional -f4 -out private.pem 4096
 # Generate from private key, a public key
 > openssl rsa -in private.pem -outform PEM -pubout -out public.pem
 ```
