@@ -11,7 +11,7 @@ require (
 	github.com/spf13/cobra v0.0.7
 	github.com/stretchr/testify v1.7.0
 	github.com/sumup-oss/go-pkgs v0.0.0-20210806131309-dd59fc2fd123
-	github.com/zclconf/go-cty v1.9.0
+	github.com/zclconf/go-cty v1.13.0
 )
 
 go 1.16
